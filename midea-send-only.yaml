@@ -1,7 +1,24 @@
 esphome:
   name: midea-dual-control
   friendly_name: Midea Dual Control
-
+  # ✅ on_boot 必须写在 esphome: 内部
+  on_boot:
+    - priority: 600  # 在 WiFi 连接后执行
+      then:
+        # 初始化 binary_sensor 为 OFF
+        - binary_sensor.template.publish:
+            id: dev3_power
+            state: 'OFF'
+        - binary_sensor.template.publish:
+            id: dev3_fan_running
+            state: 'OFF'
+        # 初始化 sensor 为 0
+        - sensor.template.publish:
+            id: dev3_fan_speed
+            state: 0
+        - sensor.template.publish:
+            id: dev3_brightness
+            state: 0
 esp32:
   board: esp32-c3-devkitm-1
   framework:
@@ -386,32 +403,19 @@ esp32_ble_tracker:
             }
           }
 
-# ========== Dev3 实体 (修复版：兼容 ESPHome 规范) ==========
+# ========== Dev3 实体 (纯净版) ==========
 binary_sensor:
   - platform: template
     name: "Dev3 Light Power"
     id: dev3_power
     device_class: light
     icon: mdi:ceiling-light
-    # binary_sensor 不支持 restore_mode，用启动时发布默认值替代
-    on_boot:
-      priority: 600  # 在 WiFi 连接后执行
-      then:
-        - binary_sensor.template.publish:
-            id: dev3_power
-            state: OFF
 
   - platform: template
     name: "Dev3 Fan Running"
     id: dev3_fan_running
     device_class: running
     icon: mdi:fan
-    on_boot:
-      priority: 600
-      then:
-        - binary_sensor.template.publish:
-            id: dev3_fan_running
-            state: OFF
 
 sensor:
   - platform: template
@@ -420,13 +424,6 @@ sensor:
     unit_of_measurement: "档"
     accuracy_decimals: 0
     icon: mdi:numeric
-    # 启动时发布 0 档
-    on_boot:
-      priority: 600
-      then:
-        - sensor.template.publish:
-            id: dev3_fan_speed
-            state: 0
     
   - platform: template
     name: "Dev3 Brightness"
@@ -434,9 +431,3 @@ sensor:
     unit_of_measurement: "%"
     accuracy_decimals: 0
     icon: mdi:brightness-percent
-    on_boot:
-      priority: 600
-      then:
-        - sensor.template.publish:
-            id: dev3_brightness
-            state: 0
