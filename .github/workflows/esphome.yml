@@ -15,10 +15,10 @@ jobs:
         with:
           yaml-file: midea-send-only.yaml
 
-- uses: actions/upload-artifact@v4
-  with:
-    name: firmware
-    path: |
-      .esphome/build/**/*.bin
-      ./.esphome/build/**/*.bin
-      ./build/**/*.bin
+      - name: List build files
+        run: find . -name "*.bin"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: "**/*.bin"
