@@ -386,21 +386,32 @@ esp32_ble_tracker:
             }
           }
 
-# ========== Dev3 实体 (修复版：防 Unknown) ==========
+# ========== Dev3 实体 (修复版：兼容 ESPHome 规范) ==========
 binary_sensor:
   - platform: template
     name: "Dev3 Light Power"
     id: dev3_power
     device_class: light
     icon: mdi:ceiling-light
-    restore_mode: ALWAYS_OFF  # 启动默认关，不显示未知
+    # binary_sensor 不支持 restore_mode，用启动时发布默认值替代
+    on_boot:
+      priority: 600  # 在 WiFi 连接后执行
+      then:
+        - binary_sensor.template.publish:
+            id: dev3_power
+            state: OFF
 
   - platform: template
     name: "Dev3 Fan Running"
     id: dev3_fan_running
     device_class: running
     icon: mdi:fan
-    restore_mode: ALWAYS_OFF
+    on_boot:
+      priority: 600
+      then:
+        - binary_sensor.template.publish:
+            id: dev3_fan_running
+            state: OFF
 
 sensor:
   - platform: template
@@ -409,6 +420,13 @@ sensor:
     unit_of_measurement: "档"
     accuracy_decimals: 0
     icon: mdi:numeric
+    # 启动时发布 0 档
+    on_boot:
+      priority: 600
+      then:
+        - sensor.template.publish:
+            id: dev3_fan_speed
+            state: 0
     
   - platform: template
     name: "Dev3 Brightness"
@@ -416,8 +434,9 @@ sensor:
     unit_of_measurement: "%"
     accuracy_decimals: 0
     icon: mdi:brightness-percent
-    # 传感器无 restore_mode，用 on_boot 兜底
-    filters:
-      - lambda: |-
-          if (x == 0) return 0; // 防启动时 0 值闪烁
-          return x;
+    on_boot:
+      priority: 600
+      then:
+        - sensor.template.publish:
+            id: dev3_brightness
+            state: 0
