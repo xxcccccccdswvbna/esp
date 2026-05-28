@@ -3,7 +3,7 @@ esphome:
   friendly_name: Midea Fan Light Pro
 
 esp32:
-  board: esp32-c3-devkitm-1 # 请确认你的板子型号，如果是 ESP32 DevKit 请改为 esp32dev
+  board: esp32-c3-devkitm-1 # 请确认你的板子型号
   framework:
     type: esp-idf
 
@@ -23,6 +23,7 @@ wifi:
   ssid: "CC"
   password: "chen1122"
 
+
 # ================= BLE 核心配置 =================
 esp32_ble:
   io_capability: none
@@ -39,9 +40,9 @@ esp32_ble_tracker:
     window: 150ms
     active: false
   
-  # 【关键修复】这里使用列表结构来过滤 Manufacturer ID
+  # 【关键修复】manufacturer_id 必须是字符串格式
   on_ble_manufacturer_data_advertise:
-    - manufacturer_id: 0x4D11  # 注意：这里是十六进制整数，不是字符串
+    - manufacturer_id: "4D11"  # ✅ 改为字符串 "4D11"
       then:
         - lambda: |-
             // !!! 替换为你的风扇灯 MAC 地址 (小写，带冒号) !!!
