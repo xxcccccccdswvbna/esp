@@ -330,3 +330,61 @@ button:
       - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt));'
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
+# ========== 新增：新版协议设备 (Dev3) 状态监听 ==========
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1000ms
+    window: 500ms
+    active: false
+  on_ble_manufacturer_data_advertise:
+    - manufacturer_id: "134D"  # 新设备 Company ID
+      then:
+        - lambda: |-
+            if (x.size() < 20) return;
+            if (x[0] != 0x21) return;  // 协议头过滤
+            
+            // MAC 过滤: 00:00:70:27:80:48 → 广播反向: 48 80 27 70 00 00
+            if (x[2]!=0x48 || x[3]!=0x80 || x[4]!=0x27 || x[5]!=0x70 || x[6]!=0x00 || x[7]!=0x00) return;
+            
+            // 解析字段
+            bool power_on = (x[9] == 0x01);
+            bool fan_running = (x[18] & 0x01);
+            uint8_t fan_gear_idx = x[19];
+            uint16_t brt_raw = (x[14] << 8) | x[15];
+            
+            // 发布到 HA
+            id(dev3_power).publish_state(power_on);
+            id(dev3_fan_running).publish_state(fan_running);
+            id(dev3_fan_speed).publish_state(fan_running ? (fan_gear_idx + 1) : 0);
+            id(dev3_brightness).publish_state(brt_raw == 0xFFFF ? 100 : (int)(brt_raw / 655.35));
+            
+            // 调试日志 (ESPHome 日志面板可见)
+            ESP_LOGI("Dev3_State", "Power=%d Fan=%d(Idx%d) BRT=%d%%", 
+                     power_on, fan_running, fan_gear_idx, (brt_raw==0xFFFF?100:(int)(brt_raw/655.35)));
+
+# ========== Dev3 状态实体 (只读) ==========
+binary_sensor:
+  - platform: template
+    name: "Dev3 Light Power"
+    id: dev3_power
+    device_class: light
+    icon: mdi:ceiling-light
+  - platform: template
+    name: "Dev3 Fan Running"
+    id: dev3_fan_running
+    device_class: running
+    icon: mdi:fan
+
+sensor:
+  - platform: template
+    name: "Dev3 Fan Speed"
+    id: dev3_fan_speed
+    unit_of_measurement: "档"
+    accuracy_decimals: 0
+    icon: mdi:numeric
+  - platform: template
+    name: "Dev3 Brightness"
+    id: dev3_brightness
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    icon: mdi:brightness-percent 
