@@ -17,11 +17,13 @@ jobs:
         with:
           yaml-file: midea-send-only.yaml
 
-      - name: List build files
-        run: find . -name "*.bin"
+      - name: Copy firmware files
+        run: |
+          mkdir output
+          cp ./.esphome/build/midea-send-only/.pioenvs/midea-send-only/*.bin output/
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
           name: firmware
-          path: "**/*.bin"
+          path: output/*.bin
