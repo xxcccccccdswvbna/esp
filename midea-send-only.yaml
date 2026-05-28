@@ -22,8 +22,6 @@ ota:
 wifi:
   ssid: "CC"
   password: "chen1122"
-
-
 # ================= BLE 核心配置 =================
 esp32_ble:
   io_capability: none
@@ -176,4 +174,4 @@ binary_sensor:
     name: "Midea Light Status"
     id: midea_light
     device_class: light
-    restore_mode: RESTORE_DEFAULT_OFF
+    # ✅ 已删除 restore_mode，因为 binary_sensor.template 不支持此参数
