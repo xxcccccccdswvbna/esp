@@ -3,112 +3,81 @@ esphome:
   friendly_name: Midea Send Only
 
 esp32:
-  board: esp32dev
+  board: esp32-c3-devkitm-1
   framework:
     type: esp-idf
 
-# Enable logging
 logger:
 
-# Enable Home Assistant API
 api:
   encryption:
     key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
-  reboot_timeout: 1h
 
 ota:
-  platform: esphome
-  password: "chen1122"
+  - platform: esphome
+    password: "chen1122"
 
 wifi:
-  ssid: "CC"
-  password: "chen1122"
-  power_save_mode: NONE
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
   manual_ip:
     static_ip: 192.168.6.72
     gateway: 192.168.6.1
     subnet: 255.255.255.0
 
+  power_save_mode: NONE
+
 captive_portal:
 
-# ========== BLE 发送部分 ==========
-esp32_ble:
+esp32_ble_beacon:
+  type: iBeacon
+  uuid: "00000000-0000-0000-0000-000000000000"
 
-esp32_ble_server:
-  id: ble_server
-  # 初始为空，避免开机广播干扰
-  manufacturer_data: []
-
-# ========== 全局变量 (仅用于防止重复点击) ==========
 globals:
-  - id: is_sending
+  - id: sending
     type: bool
+    restore_value: no
     initial_value: 'false'
 
-# ========== 清空广播脚本 ==========
-script:
-  - id: clear_broadcast
-    then:
-      - delay: 500ms
-      - lambda: |-
-          // 发送空数据以停止广播
-          std::vector<uint8_t> empty = {};
-          id(ble_server).set_manufacturer_data(empty);
-      - delay: 500ms
-      - globals.set:
-          id: is_sending
-          value: 'false'
+button:
 
-# ========== 主开关 (点击一次发送两组数据) ==========
-switch:
   - platform: template
     name: "Midea Light Toggle"
-    id: midea_switch
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
-   
-    turn_on_action:
-      # 防止重复点击导致冲突
+    id: midea_light_toggle
+
+    on_press:
       - if:
           condition:
-            lambda: 'return id(is_sending);'
+            lambda: 'return id(sending);'
           then:
-            - logger.log: "Already sending, ignored."
+            - logger.log: "BLE busy"
           else:
             - globals.set:
-                id: is_sending
+                id: sending
                 value: 'true'
-            
-            # --- 第一步：发送第一组数据 (灯开/指令1) ---
-            - lambda: |-
-                // 数据: 0x191C488027700000017170065FC86FB84848A7F08080972F
-                std::vector<uint8_t> mfr_data_1 = {
-                  0x19, 0x1C, 0x48, 0x80, 0x27, 0x70, 0x00, 0x00, 
-                  0x01, 0x71, 0x70, 0x06, 0x5F, 0xC8, 0x6F, 0xB8, 
-                  0x48, 0x48, 0xA7, 0xF0, 0x80, 0x80, 0x97, 0x2F
-                };
-                id(ble_server).set_manufacturer_data(mfr_data_1);
-                ESP_LOGI("BLE", "Sending Packet 1 (0x191C...)");
-            
-            # 等待短暂时间，确保设备接收
-            - delay: 200ms 
 
-            # --- 第二步：发送第二组数据 (灯关/指令2) ---
             - lambda: |-
-                // 数据: 0x191A4880277000000126277070005FC86FB84848A7F08082
-                std::vector<uint8_t> mfr_data_2 = {
-                  0x19, 0x1A, 0x48, 0x80, 0x27, 0x70, 0x00, 0x00, 
-                  0x01, 0x26, 0x27, 0x70, 0x70, 0x00, 0x5F, 0xC8, 
-                  0x6F, 0xB8, 0x48, 0x48, 0xA7, 0xF0, 0x80, 0x82
-                };
-                id(ble_server).set_manufacturer_data(mfr_data_2);
-                ESP_LOGI("BLE", "Sending Packet 2 (0x191A...)");
+                ESP_LOGI("BLE", "发送灯控制广播");
 
-            # 保持第二组数据广播一段时间
+            # 第一包
+            - esp32_ble_beacon.start:
+                manufacturer_id: 19729
+                major: 0x191C
+                minor: 0x4880
+
+            - delay: 300ms
+
+            # 第二包
+            - esp32_ble_beacon.start:
+                manufacturer_id: 19729
+                major: 0x191A
+                minor: 0x4880
+
             - delay: 1000ms
 
-            # --- 第三步：清空广播 ---
-            - script.execute: clear_broadcast
-            
-            # 自动复位开关状态，方便下次点击
-            - switch.turn_off: midea_switch
+            - esp32_ble_beacon.stop
+
+            - globals.set:
+                id: sending
+                value: 'false'
