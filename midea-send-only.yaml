@@ -12,6 +12,7 @@ logger:
 api:
   encryption:
     key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
+  reboot_timeout: 1h
 
 ota:
   - platform: esphome
@@ -26,22 +27,17 @@ wifi:
     gateway: 192.168.6.1
     subnet: 255.255.255.0
 
-  power_save_mode: NONE
-
 captive_portal:
 
-esp32_ble_beacon:
-  type: iBeacon
-  uuid: "00000000-0000-0000-0000-000000000000"
+esp32_ble_tracker:
 
 globals:
-  - id: sending
+  - id: is_sending
     type: bool
     restore_value: no
     initial_value: 'false'
 
 button:
-
   - platform: template
     name: "Midea Light Toggle"
     id: midea_light_toggle
@@ -49,35 +45,61 @@ button:
     on_press:
       - if:
           condition:
-            lambda: 'return id(sending);'
+            lambda: 'return id(is_sending);'
           then:
             - logger.log: "BLE busy"
+
           else:
             - globals.set:
-                id: sending
+                id: is_sending
                 value: 'true'
 
             - lambda: |-
-                ESP_LOGI("BLE", "发送灯控制广播");
+                #include "esp_gap_ble_api.h"
 
-            # 第一包
-            - esp32_ble_beacon.start:
-                manufacturer_id: 19729
-                major: 0x191C
-                minor: 0x4880
+                uint8_t packet1[] = {
+                  0x1F,0x02,0x01,0x06,
+                  0x1B,0xFF,0x11,0x4D,
+                  0x19,0x1C,0x48,0x80,0x27,0x70,0x00,0x00,
+                  0x01,0x71,0x70,0x06,0x5F,0xC8,0x6F,0xB8,
+                  0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x2F
+                };
 
-            - delay: 300ms
+                esp_ble_gap_config_adv_data_raw(
+                  packet1,
+                  sizeof(packet1)
+                );
 
-            # 第二包
-            - esp32_ble_beacon.start:
-                manufacturer_id: 19729
-                major: 0x191A
-                minor: 0x4880
+                esp_ble_gap_start_advertising(nullptr);
 
-            - delay: 1000ms
+                ESP_LOGI("BLE", "Sent packet1");
 
-            - esp32_ble_beacon.stop
+            - delay: 250ms
+
+            - lambda: |-
+                #include "esp_gap_ble_api.h"
+
+                uint8_t packet2[] = {
+                  0x1F,0x02,0x01,0x06,
+                  0x1B,0xFF,0x11,0x4D,
+                  0x19,0x1A,0x48,0x80,0x27,0x70,0x00,0x00,
+                  0x01,0x26,0x27,0x70,0x70,0x00,0x5F,0xC8,
+                  0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x82
+                };
+
+                esp_ble_gap_config_adv_data_raw(
+                  packet2,
+                  sizeof(packet2)
+                );
+
+                ESP_LOGI("BLE", "Sent packet2");
+
+            - delay: 1200ms
+
+            - lambda: |-
+                #include "esp_gap_ble_api.h"
+                esp_ble_gap_stop_advertising();
 
             - globals.set:
-                id: sending
+                id: is_sending
                 value: 'false'
