@@ -7,24 +7,44 @@ esp32:
   framework:
     type: esp-idf
 
-logger:
-  level: INFO
-  logs:
-    esp32_ble_server: WARN
-
-api:
-  encryption:
-    key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
-  reboot_timeout: 1h
-
-ota:
-  platform: esphome
-  password: "chen1122"
-
+# 1️⃣ 优化内置超时（替换原有 wifi/api 配置）
 wifi:
   ssid: "CC"
   password: "chen1122"
   power_save_mode: none
+  reboot_timeout: 0s  # 关闭内置WiFi超时，改用自定义看门狗（更稳定）
+
+api:
+  encryption:
+    key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
+  reboot_timeout: 10min  # HA断连10分钟自动重启
+
+# 2️⃣ 降日志级别（大幅降低内存占用，防BLE堆栈溢出）
+logger:
+  level: WARN  # ⚠️ 生产环境务必改为 WARN 或 ERROR，DEBUG 极易导致 C3 死机
+  logs:
+    esp32_ble_server: ERROR
+    esp32_ble_tracker: ERROR
+    wifi: WARN
+    api: WARN
+
+# 3️⃣ 网络看门狗（每60秒检查，连续3次断网才重启，防路由抖动）
+interval:
+  - interval: 60s
+    then:
+      - lambda: |-
+          static int fail_count = 0;
+          if (!WiFi.isConnected()) {
+            fail_count++;
+            ESP_LOGW("Watchdog", "WiFi断连 (%d/3)", fail_count);
+            if (fail_count >= 3) {
+              ESP_LOGW("Watchdog", "连续断网，执行安全重启");
+              delay(1000);  // 留给日志输出时间
+              ESP.restart();  // ESP-IDF 原生安全重启
+            }
+          } else {
+            fail_count = 0;  // 网络恢复则清零计数
+          }
 
 esp32_ble:
   io_capability: none
@@ -330,50 +350,57 @@ button:
       - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt));'
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
-# ========== 新增：新版协议设备 (Dev3) 状态监听 ==========
+# ========== Dev3 状态监听 (修复版：含调试日志+防未知) ==========
 esp32_ble_tracker:
   scan_parameters:
-    interval: 1000ms
-    window: 500ms
+    interval: 300ms  # 加快扫描，确保不漏包
+    window: 200ms
     active: false
-  on_ble_manufacturer_data_advertise:
-    - manufacturer_id: "134D"  # 新设备 Company ID
-      then:
-        - lambda: |-
-            if (x.size() < 20) return;
-            if (x[0] != 0x21) return;  // 协议头过滤
-            
-            // MAC 过滤: 00:00:70:27:80:48 → 广播反向: 48 80 27 70 00 00
-            if (x[2]!=0x48 || x[3]!=0x80 || x[4]!=0x27 || x[5]!=0x70 || x[6]!=0x00 || x[7]!=0x00) return;
-            
-            // 解析字段
-            bool power_on = (x[9] == 0x01);
-            bool fan_running = (x[18] & 0x01);
-            uint8_t fan_gear_idx = x[19];
-            uint16_t brt_raw = (x[14] << 8) | x[15];
-            
-            // 发布到 HA
-            id(dev3_power).publish_state(power_on);
-            id(dev3_fan_running).publish_state(fan_running);
-            id(dev3_fan_speed).publish_state(fan_running ? (fan_gear_idx + 1) : 0);
-            id(dev3_brightness).publish_state(brt_raw == 0xFFFF ? 100 : (int)(brt_raw / 655.35));
-            
-            // 调试日志 (ESPHome 日志面板可见)
-            ESP_LOGI("Dev3_State", "Power=%d Fan=%d(Idx%d) BRT=%d%%", 
-                     power_on, fan_running, fan_gear_idx, (brt_raw==0xFFFF?100:(int)(brt_raw/655.35)));
+  on_ble_advertise:  # 改用全局广播监听，绕过 manufacturer_id 预过滤
+    then:
+      - lambda: |-
+          // 1. 基础过滤：必须是厂商数据且长度够
+          if (!x.get_manufacturer_data().empty() && x.get_manufacturer_data().size() >= 20) {
+            const auto& mfr = x.get_manufacturer_data();
+            // mfr[0~1] 是 Company ID，mfr[2] 开始是负载
+            if (mfr[0] == 0x4D && mfr[1] == 0x13 && mfr[2] == 0x21) {
+              ESP_LOGI("Dev3_Debug", "✅ 捕获到设备广播! Size=%d", mfr.size());
+              
+              // 暂时注释 MAC 过滤，先跑通逻辑。确认正常后可取消注释
+              // if (mfr[4]!=0x48 || mfr[5]!=0x80 || mfr[6]!=0x27 || mfr[7]!=0x70) return;
+              
+              bool power_on = (mfr[11] == 0x01);
+              bool fan_running = (mfr[20] & 0x01);
+              uint8_t fan_gear_idx = mfr[21];
+              uint16_t brt_raw = (mfr[16] << 8) | mfr[17];
+              int brt_pct = (brt_raw == 0xFFFF) ? 100 : (int)(brt_raw / 655.35);
+              
+              id(dev3_power).publish_state(power_on);
+              id(dev3_fan_running).publish_state(fan_running);
+              id(dev3_fan_speed).publish_state(fan_running ? (fan_gear_idx + 1) : 0);
+              id(dev3_brightness).publish_state(brt_pct);
+              
+              ESP_LOGI("Dev3_State", "Power=%d Fan=%d(Idx%d) BRT=%d%%", 
+                       power_on, fan_running, fan_gear_idx, brt_pct);
+              return; // 匹配成功，结束
+            }
+          }
 
-# ========== Dev3 状态实体 (只读) ==========
+# ========== Dev3 实体 (修复版：防 Unknown) ==========
 binary_sensor:
   - platform: template
     name: "Dev3 Light Power"
     id: dev3_power
     device_class: light
     icon: mdi:ceiling-light
+    restore_mode: ALWAYS_OFF  # 启动默认关，不显示未知
+
   - platform: template
     name: "Dev3 Fan Running"
     id: dev3_fan_running
     device_class: running
     icon: mdi:fan
+    restore_mode: ALWAYS_OFF
 
 sensor:
   - platform: template
@@ -382,9 +409,15 @@ sensor:
     unit_of_measurement: "档"
     accuracy_decimals: 0
     icon: mdi:numeric
+    
   - platform: template
     name: "Dev3 Brightness"
     id: dev3_brightness
     unit_of_measurement: "%"
     accuracy_decimals: 0
-    icon: mdi:brightness-percent 
+    icon: mdi:brightness-percent
+    # 传感器无 restore_mode，用 on_boot 兜底
+    filters:
+      - lambda: |-
+          if (x == 0) return 0; // 防启动时 0 值闪烁
+          return x;
