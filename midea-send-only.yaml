@@ -1,6 +1,6 @@
 esphome:
-  name: midea-fan-light-complete
-  friendly_name: Midea Fan Light Complete
+  name: midea-fan-light
+  friendly_name: Midea Fan Light
 
 esp32:
   board: esp32-c3-devkitm-1
@@ -9,13 +9,10 @@ esp32:
 
 logger:
   level: INFO
-  logs:
-    esp32_ble_server: WARN
 
 api:
   encryption:
     key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
-  reboot_timeout: 1h
 
 ota:
   platform: esphome
@@ -24,208 +21,194 @@ ota:
 wifi:
   ssid: "CC"
   password: "chen1122"
-  power_save_mode: none
 
 esp32_ble:
-  io_capability: none
 
 esp32_ble_server:
   id: ble_server
   manufacturer_data: []
 
-# ========== 全局互斥锁 ==========
+# =====================
+# 全局变量
+# =====================
 globals:
   - id: is_sending
     type: bool
     initial_value: 'false'
 
-# ========== 按钮控制 ==========
+# =====================
+# 清空广播（稳定核心）
+# =====================
+script:
+  - id: clear_broadcast
+    mode: queued
+    then:
+      - delay: 80ms
+      - lambda: |-
+          id(ble_server).set_manufacturer_data({});
+      - delay: 120ms
+      - lambda: |-
+          id(ble_server).set_manufacturer_data({});
+      - delay: 120ms
+      - globals.set:
+          id: is_sending
+          value: 'false'
+
+# =====================
+# 灯控制
+# =====================
+switch:
+  - platform: template
+    name: "灯开关"
+    id: light_switch
+    optimistic: true
+
+    turn_on_action:
+      - lambda: |-
+          std::vector<uint8_t> pkt1 = {
+            0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,
+            0x01,0xA6,0xF0,0x86,0x80,0x97,0x27,0x27,
+            0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x40
+          };
+          id(ble_server).set_manufacturer_data(pkt1);
+
+      - delay: 120ms
+
+      - lambda: |-
+          std::vector<uint8_t> pkt2 = {
+            0x11,0x4D,0x19,0x1C,0x48,0x80,0x27,0x70,0x00,0x00,
+            0x01,0x71,0x70,0x00,0x5F,0xC8,0x6F,0xB8,
+            0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x25
+          };
+          id(ble_server).set_manufacturer_data(pkt2);
+
+      - script.execute: clear_broadcast
+
+    turn_off_action:
+      - script.execute: light_switch.turn_on
+
+
+# =====================
+# 风扇开关
+# =====================
+  - platform: template
+    name: "风扇开关"
+    id: fan_switch
+    optimistic: true
+
+    turn_on_action:
+      - lambda: |-
+          std::vector<uint8_t> pkt1 = {
+            0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,
+            0x01,0xA6,0xF0,0x89,0x80,0x97,0x27,0x27,
+            0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x43
+          };
+          id(ble_server).set_manufacturer_data(pkt1);
+
+      - delay: 120ms
+
+      - lambda: |-
+          std::vector<uint8_t> pkt2 = {
+            0x11,0x4D,0x19,0x1F,0x48,0x80,0x27,0x70,0x00,0x00,
+            0x01,0x5E,0xC8,0x6F,0xB8,0x48,0x48,
+            0xA7,0xF0,0x80,0x80,0x97,0x27,0x27,0x70,0x72
+          };
+          id(ble_server).set_manufacturer_data(pkt2);
+
+      - script.execute: clear_broadcast
+
+    turn_off_action:
+      - script.execute: fan_switch.turn_on
+
+
+# =====================
+# 风扇档位（滑条）
+# =====================
+number:
+  - platform: template
+    name: "风扇档位"
+    id: fan_level
+    min_value: 0
+    max_value: 6
+    step: 1
+    optimistic: true
+
+    set_action:
+      - lambda: |-
+          int lv = (int)x;
+
+      - if:
+          condition:
+            lambda: 'return x == 1;'
+          then:
+            - lambda: |-
+                std::vector<uint8_t> pkt = {
+                  0x11,0x4D,0x19,0x1B,0x48,0x80,0x27,0x70,0x00,0x00,
+                  0x01,0x26,0x70,0x69,0x00,0x5F,0xC8,0x6F,0xB8,
+                  0x48,0x48,0xA7,0xF0,0x80,0x80,0x8C
+                };
+                id(ble_server).set_manufacturer_data(pkt);
+            - script.execute: clear_broadcast
+
+      - if:
+          condition:
+            lambda: 'return x == 2;'
+          then:
+            - lambda: |-
+                std::vector<uint8_t> pkt = {
+                  0x11,0x4D,0x19,0x1B,0x48,0x80,0x27,0x70,0x00,0x00,
+                  0x01,0x26,0x70,0x6A,0x00,0x5F,0xC8,0x6F,0xB8,
+                  0x48,0x48,0xA7,0xF0,0x80,0x80,0x8B
+                };
+                id(ble_server).set_manufacturer_data(pkt);
+            - script.execute: clear_broadcast
+
+      - if:
+          condition:
+            lambda: 'return x == 3;'
+          then:
+            - lambda: |-
+                std::vector<uint8_t> pkt = {
+                  0x11,0x4D,0x19,0x1A,0x48,0x80,0x27,0x70,0x00,0x00,
+                  0x01,0x26,0x27,0xF1,0x70,0x00,0x5F,0xC8,
+                  0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x03
+                };
+                id(ble_server).set_manufacturer_data(pkt);
+            - script.execute: clear_broadcast
+
+      # ===== 4~6档（你可继续扩展） =====
+      - if:
+          condition:
+            lambda: 'return x == 4;'
+          then:
+            - script.execute: fan_4
+
+      - if:
+          condition:
+            lambda: 'return x == 5;'
+          then:
+            - script.execute: fan_5
+
+      - if:
+          condition:
+            lambda: 'return x == 6;'
+          then:
+            - script.execute: fan_6
+
+
+# =====================
+# 风扇反转
+# =====================
 button:
-  # 💡 灯光开关
   - platform: template
-    name: "Midea Light Toggle"
-    icon: mdi:lightbulb
+    name: "风扇反转"
     on_press:
-      - if:
-          condition:
-            lambda: 'return !id(is_sending);'
-          then:
-            - globals.set: {id: is_sending, value: 'true'}
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x86,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x40});
-            - delay: 200ms
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x1C,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x71,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x25});
-            - delay: 200ms
-            - lambda: 'id(ble_server).set_manufacturer_data({});'
-            - globals.set: {id: is_sending, value: 'false'}
-          else:
-            - logger.log: "⏳ 指令发送中，请稍后"
+      - lambda: |-
+          std::vector<uint8_t> pkt = {
+            0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,
+            0x01,0xA6,0xF0,0x9C,0x80,0x97,0x27,0x27,
+            0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x56
+          };
+          id(ble_server).set_manufacturer_data(pkt);
 
-  # 🌀 风扇开关
-  - platform: template
-    name: "Midea Fan Toggle"
-    icon: mdi:fan
-    on_press:
-      - if:
-          condition:
-            lambda: 'return !id(is_sending);'
-          then:
-            - globals.set: {id: is_sending, value: 'true'}
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x89,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x43});
-            - delay: 200ms
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x1F,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x5E,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x27,0x27,0x70,0x72});
-            - delay: 200ms
-            - lambda: 'id(ble_server).set_manufacturer_data({});'
-            - globals.set: {id: is_sending, value: 'false'}
-          else:
-            - logger.log: "⏳ 指令发送中，请稍后"
-
-  # 🔢 风扇 1 档
-  - platform: template
-    name: "Midea Fan Speed 1"
-    icon: mdi:numeric-1
-    on_press:
-      - if:
-          condition:
-            lambda: 'return !id(is_sending);'
-          then:
-            - globals.set: {id: is_sending, value: 'true'}
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x1B,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x26,0x70,0x69,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x80,0x8C});
-            - delay: 200ms
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x1E,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x01,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x27,0x27,0x72});
-            - delay: 200ms
-            - lambda: 'id(ble_server).set_manufacturer_data({});'
-            - globals.set: {id: is_sending, value: 'false'}
-          else:
-            - logger.log: "⏳ 指令发送中，请稍后"
-
-  # 🔢 风扇 2 档
-  - platform: template
-    name: "Midea Fan Speed 2"
-    icon: mdi:numeric-2
-    on_press:
-      - if:
-          condition:
-            lambda: 'return !id(is_sending);'
-          then:
-            - globals.set: {id: is_sending, value: 'true'}
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x1B,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x26,0x70,0x6A,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x80,0x8B});
-            - delay: 200ms
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x11,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x6E,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5D});
-            - delay: 200ms
-            - lambda: 'id(ble_server).set_manufacturer_data({});'
-            - globals.set: {id: is_sending, value: 'false'}
-          else:
-            - logger.log: "⏳ 指令发送中，请稍后"
-
-  # 🔢 风扇 3 档
-  - platform: template
-    name: "Midea Fan Speed 3"
-    icon: mdi:numeric-3
-    on_press:
-      - if:
-          condition:
-            lambda: 'return !id(is_sending);'
-          then:
-            - globals.set: {id: is_sending, value: 'true'}
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x1A,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x26,0x27,0xF1,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x03});
-            - delay: 200ms
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x16,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xF1,0x80,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x4A});
-            - delay: 200ms
-            - lambda: 'id(ble_server).set_manufacturer_data({});'
-            - globals.set: {id: is_sending, value: 'false'}
-          else:
-            - logger.log: "⏳ 指令发送中，请稍后"
-
-  # 🔢 风扇 4 档
-  - platform: template
-    name: "Midea Fan Speed 4"
-    icon: mdi:numeric-4
-    on_press:
-      - if:
-          condition:
-            lambda: 'return !id(is_sending);'
-          then:
-            - globals.set: {id: is_sending, value: 'true'}
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x1A,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x26,0x27,0xF8,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x0A});
-            - delay: 200ms
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x1A,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x26,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x82});
-            - delay: 200ms
-            - lambda: 'id(ble_server).set_manufacturer_data({});'
-            - globals.set: {id: is_sending, value: 'false'}
-          else:
-            - logger.log: "⏳ 指令发送中，请稍后"
-
-  # 🔢 风扇 5 档
-  - platform: template
-    name: "Midea Fan Speed 5"
-    icon: mdi:numeric-5
-    on_press:
-      - if:
-          condition:
-            lambda: 'return !id(is_sending);'
-          then:
-            - globals.set: {id: is_sending, value: 'true'}
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x13,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x49,0x48,0x22,0xF0,0x80,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0xE8});
-            - delay: 200ms
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x80,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x4A});
-            - delay: 200ms
-            - lambda: 'id(ble_server).set_manufacturer_data({});'
-            - globals.set: {id: is_sending, value: 'false'}
-          else:
-            - logger.log: "⏳ 指令发送中，请稍后"
-
-  # 🔢 风扇 6 档
-  - platform: template
-    name: "Midea Fan Speed 6"
-    icon: mdi:numeric-6
-    on_press:
-      - if:
-          condition:
-            lambda: 'return !id(is_sending);'
-          then:
-            - globals.set: {id: is_sending, value: 'true'}
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x17,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x81,0x80,0x11,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0x2F});
-            - delay: 200ms
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x1D,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x71,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x27,0x25});
-            - delay: 200ms
-            - lambda: 'id(ble_server).set_manufacturer_data({});'
-            - globals.set: {id: is_sending, value: 'false'}
-          else:
-            - logger.log: "⏳ 指令发送中，请稍后"
-
-  # 🔄 风扇反转
-  - platform: template
-    name: "Midea Fan Reverse"
-    icon: mdi:sync-reverse
-    on_press:
-      - if:
-          condition:
-            lambda: 'return !id(is_sending);'
-          then:
-            - globals.set: {id: is_sending, value: 'true'}
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x9C,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x56});
-            - delay: 200ms
-            - lambda: |-
-                id(ble_server).set_manufacturer_data({0x11,0x4D,0x19,0x18,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x81,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF2});
-            - delay: 200ms
-            - lambda: 'id(ble_server).set_manufacturer_data({});'
-            - globals.set: {id: is_sending, value: 'false'}
-          else:
-            - logger.log: "⏳ 指令发送中，请稍后"
+      - script.execute: clear_broadcast
