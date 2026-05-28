@@ -229,3 +229,52 @@ button:
             - globals.set: {id: is_sending, value: 'false'}
           else:
             - logger.log: "⏳ 指令发送中，请稍后"
+# ========== 亮度 & 色温滑块控制 ==========
+number:
+  - platform: template
+    name: "Midea Light Brightness"
+    id: ctrl_brightness
+    min_value: 0
+    max_value: 100
+    step: 5
+    mode: slider
+    optimistic: true
+    set_action:
+      - lambda: |-
+          if (id(is_sending)) return;
+          id(is_sending) = true;
+          uint8_t brt = (uint8_t)(x * 255.0 / 100.0);
+          // 基础包 (复用灯光Toggle的CMD包)
+          std::vector<uint8_t> pkt = {0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x86,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x40};
+          pkt[17] = brt; // 索引17控制亮度 (0x00=0% ~ 0xFF=100%)
+          id(ble_server).set_manufacturer_data(pkt);
+          delay(200);
+          // 结束包
+          std::vector<uint8_t> end = {0x11,0x4D,0x19,0x1C,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x71,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x25};
+          id(ble_server).set_manufacturer_data(end);
+          delay(200);
+          id(ble_server).set_manufacturer_data({});
+          id(is_sending) = false;
+
+  - platform: template
+    name: "Midea Light Color Temp"
+    id: ctrl_colortemp
+    min_value: 2700
+    max_value: 6500
+    step: 100
+    mode: slider
+    optimistic: true
+    set_action:
+      - lambda: |-
+          if (id(is_sending)) return;
+          id(is_sending) = true;
+          uint8_t ct = (uint8_t)((x - 2700.0) / 3800.0 * 255.0);
+          std::vector<uint8_t> pkt = {0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x86,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x40};
+          pkt[18] = ct; // 索引18控制色温 (0x00=2700K ~ 0xFF=6500K)
+          id(ble_server).set_manufacturer_data(pkt);
+          delay(200);
+          std::vector<uint8_t> end = {0x11,0x4D,0x19,0x1C,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x71,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x25};
+          id(ble_server).set_manufacturer_data(end);
+          delay(200);
+          id(ble_server).set_manufacturer_data({});
+          id(is_sending) = false;
