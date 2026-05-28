@@ -104,14 +104,15 @@ script:
             lambda: 'return !id(is_sending);'
           then:
             - globals.set: {id: is_sending, value: 'true'}
+            # 步骤1：发送控制包
             - lambda: |-
-                auto cmd_pkt = id(cmd_data);
-                auto end_pkt = id(end_data);
-                id(ble_server).set_manufacturer_data(cmd_pkt);
+                id(ble_server).set_manufacturer_data(id(cmd_data));
             - delay: 200ms
+            # 步骤2：发送结束包（直接读取全局变量，解决作用域问题）
             - lambda: |-
-                id(ble_server).set_manufacturer_data(end_pkt);
+                id(ble_server).set_manufacturer_data(id(end_data));
             - delay: 200ms
+            # 步骤3：清空广播
             - lambda: |-
                 id(ble_server).set_manufacturer_data({});
             - globals.set: {id: is_sending, value: 'false'}
