@@ -28,10 +28,7 @@ esp32_ble:
 
 esp32_ble_server:
   id: ble_server
-  # 【关键修改 1】显式指定美的的 Company ID (0x4D11)
-  # 注意：这里填的是十进制或十六进制，ESPHome 会自动处理大小端
-  manufacturer_id: 0x4D11
-  # 初始为空
+  # 不设置 manufacturer_id，也不设置初始数据
   manufacturer_data: []
 
 button:
@@ -39,29 +36,32 @@ button:
     name: "Midea Light Toggle"
     icon: mdi:lightbulb
     on_press:
-      # --- 第一步：发送第一组数据 ---
+      # --- 第一步：发送第一组数据 (包含 Company ID) ---
       - lambda: |-
-          // 【关键修改 2】发送完整的 Payload，包含 0x19, 0x1C
-          // 因为 manufacturer_id 已经由上面指定了，这里只放 Payload
+          // 尝试在数据前加上 Company ID: 0x4D11 -> 小端序: 0x11, 0x4D
+          // 原始 Payload: 0x191C...
+          // 组合后: 0x11, 0x4D, 0x19, 0x1C...
           std::vector<uint8_t> pkt1 = {
+            0x11, 0x4D, // Company ID: 0x4D11 (Little Endian)
             0x19, 0x1C, 0x48, 0x80, 0x27, 0x70, 0x00, 0x00, 
             0x01, 0x71, 0x70, 0x06, 0x5F, 0xC8, 0x6F, 0xB8, 
             0x48, 0x48, 0xA7, 0xF0, 0x80, 0x80, 0x97, 0x2F
           };
           id(ble_server).set_manufacturer_data(pkt1);
-          ESP_LOGD("BLE", ">>> Sent Packet 1 (ON) with ID 0x4D11");
+          ESP_LOGD("BLE", ">>> Sent Packet 1 (with CID)");
 
       - delay: 120ms
 
-      # --- 第二步：发送第二组数据 ---
+      # --- 第二步：发送第二组数据 (包含 Company ID) ---
       - lambda: |-
           std::vector<uint8_t> pkt2 = {
+            0x11, 0x4D, // Company ID: 0x4D11 (Little Endian)
             0x19, 0x1A, 0x48, 0x80, 0x27, 0x70, 0x00, 0x00, 
             0x01, 0x26, 0x27, 0x70, 0x70, 0x00, 0x5F, 0xC8, 
             0x6F, 0xB8, 0x48, 0x48, 0xA7, 0xF0, 0x80, 0x82
           };
           id(ble_server).set_manufacturer_data(pkt2);
-          ESP_LOGD("BLE", ">>> Sent Packet 2 (OFF) with ID 0x4D11");
+          ESP_LOGD("BLE", ">>> Sent Packet 2 (with CID)");
 
       - delay: 120ms
 
