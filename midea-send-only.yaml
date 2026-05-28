@@ -22,10 +22,6 @@ ota:
 wifi:
   ssid: "CC"
   password: "chen1122"
-  manual_ip:
-    static_ip: 192.168.6.72
-    gateway: 192.168.6.1
-    subnet: 255.255.255.0
 
 esp32_ble:
   io_capability: none
