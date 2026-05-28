@@ -1,12 +1,15 @@
 esphome:
   name: midea-send-only
+  friendly_name: Midea Send Only
 
 esp32:
   board: esp32-c3-devkitm-1
   framework:
     type: esp-idf
 
+# 开启调试日志，方便在 HA 中查看发送记录
 logger:
+  level: DEBUG
 
 api:
   encryption:
@@ -20,46 +23,58 @@ ota:
 wifi:
   ssid: "CC"
   password: "chen1122"
-
   manual_ip:
     static_ip: 192.168.6.72
     gateway: 192.168.6.1
     subnet: 255.255.255.0
 
+# ========== BLE 核心配置 ==========
 esp32_ble:
+  # 确保 BLE 功能开启
+  io_capability: none
 
 esp32_ble_server:
   id: ble_server
+  # 【关键】不设置 manufacturer_id，也不设置初始数据
+  # 这样 set_manufacturer_data 会直接发送我们提供的完整字节流
   manufacturer_data: []
 
+# ========== 控制按钮 ==========
 button:
   - platform: template
     name: "Midea Light Toggle"
-
+    icon: mdi:lightbulb
     on_press:
-
+      # --- 第一步：发送第一组数据 (灯开/指令1) ---
       - lambda: |-
+          // 完整数据: 0x191C488027700000017170065FC86FB84848A7F08080972F
           std::vector<uint8_t> pkt1 = {
-            0x19,0x1C,0x48,0x80,0x27,0x70,0x00,0x00,
-            0x01,0x71,0x70,0x06,0x5F,0xC8,0x6F,0xB8,
-            0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x2F
+            0x19, 0x1C, 0x48, 0x80, 0x27, 0x70, 0x00, 0x00, 
+            0x01, 0x71, 0x70, 0x06, 0x5F, 0xC8, 0x6F, 0xB8, 
+            0x48, 0x48, 0xA7, 0xF0, 0x80, 0x80, 0x97, 0x2F
           };
-
           id(ble_server).set_manufacturer_data(pkt1);
+          ESP_LOGD("BLE", ">>> Sent Packet 1 (ON)");
 
+      # 等待 120ms，给设备接收和处理的时间
       - delay: 120ms
 
+      # --- 第二步：发送第二组数据 (灯关/指令2) ---
       - lambda: |-
+          // 完整数据: 0x191A4880277000000126277070005FC86FB84848A7F08082
           std::vector<uint8_t> pkt2 = {
-            0x19,0x1A,0x48,0x80,0x27,0x70,0x00,0x00,
-            0x01,0x26,0x27,0x70,0x70,0x00,0x5F,0xC8,
-            0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x82
+            0x19, 0x1A, 0x48, 0x80, 0x27, 0x70, 0x00, 0x00, 
+            0x01, 0x26, 0x27, 0x70, 0x70, 0x00, 0x5F, 0xC8, 
+            0x6F, 0xB8, 0x48, 0x48, 0xA7, 0xF0, 0x80, 0x82
           };
-
           id(ble_server).set_manufacturer_data(pkt2);
+          ESP_LOGD("BLE", ">>> Sent Packet 2 (OFF)");
 
+      # 等待 120ms
       - delay: 120ms
 
+      # --- 第三步：清空广播，停止发送 ---
       - lambda: |-
           std::vector<uint8_t> empty = {};
           id(ble_server).set_manufacturer_data(empty);
+          ESP_LOGD("BLE", ">>> Broadcast Cleared");
