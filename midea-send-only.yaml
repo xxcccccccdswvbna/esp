@@ -3,7 +3,7 @@ esphome:
   friendly_name: Midea Fan Light Pro
 
 esp32:
-  board: esp32-c3-devkitm-1 # 请确认你的板子型号
+  board: esp32-c3-devkitm-1
   framework:
     type: esp-idf
 
@@ -22,58 +22,76 @@ ota:
 wifi:
   ssid: "CC"
   password: "chen1122"
-# ================= BLE 核心配置 =================
+  manual_ip:
+    static_ip: 192.168.6.72
+    gateway: 192.168.6.1
+    subnet: 255.255.255.0
+
 esp32_ble:
   io_capability: none
 
-# BLE Server: 用于发送控制指令
 esp32_ble_server:
   id: ble_server
   manufacturer_data: []
 
-# BLE Tracker: 用于监听设备状态
+# ================= BLE Tracker: 监听广播 =================
 esp32_ble_tracker:
   scan_parameters:
     interval: 300ms
     window: 150ms
     active: false
   
-  # 【关键修复】manufacturer_id 必须是字符串格式
-  on_ble_manufacturer_data_advertise:
-    - manufacturer_id: "4D11"  # ✅ 改为字符串 "4D11"
-      then:
-        - lambda: |-
-            // !!! 替换为你的风扇灯 MAC 地址 (小写，带冒号) !!!
-            if (x.address_str != "00:00:70:27:80:48") {
-              return;
+  # 【关键修改】使用 on_ble_advertise 以获取完整的广告对象（包含 MAC 和 Manufacturer Data）
+  on_ble_advertise:
+    then:
+      - lambda: |-
+          // 1. 过滤 MAC 地址
+          if (x.address_str != "00:00:70:27:80:48") {
+            return;
+          }
+
+          // 2. 遍历 Manufacturer Data
+          for (auto &data : x.manufacturer_data) {
+            // data.first 是 Company ID (uint16_t)
+            // data.second 是 Payload (std::vector<uint8_t>)
+            
+            // 过滤 Company ID: 0x4D11
+            if (data.first != 0x4D11) {
+              continue;
             }
 
-            // 1. 如果正在发送指令，忽略接收到的广播，防止自干扰
+            const std::vector<uint8_t> &payload = data.second;
+
+            // 3. 如果正在发送指令，忽略接收到的广播，防止自干扰
             if (id(is_sending)) {
               return;
             }
 
-            // 2. 获取原始数据长度
-            if (x.data.size() < 2) return;
+            // 4. 检查数据长度
+            if (payload.size() < 2) {
+              continue;
+            }
 
-            // 3. 解析状态位 (根据你之前的抓包分析)
-            uint8_t status_byte = x.data[1];
+            // 5. 解析状态位 (Payload 的第2个字节，索引为1)
+            uint8_t status_byte = payload[1];
             
-            // 打印调试日志，方便你在 HA 中观察规律
-            ESP_LOGD("MideaStatus", "Raw Byte[1]: 0x%02X | Size: %d", status_byte, x.data.size());
+            // 打印调试日志
+            ESP_LOGD("MideaStatus", "MAC: %s | CID: 0x%04X | Byte[1]: 0x%02X | Len: %d", 
+                     x.address_str.c_str(), data.first, status_byte, payload.size());
 
             // 【可选】如果你发现了固定的状态规律，取消下面注释并修改条件
             /*
             bool light_on = false;
             if (status_byte == 0x1C || status_byte == 0x1F) light_on = true;
             else if (status_byte == 0x1A || status_byte == 0x16) light_on = false;
-            else return; 
+            else continue; 
 
             if (id(midea_light).state != light_on) {
               id(midea_light).publish_state(light_on);
               ESP_LOGI("MideaStatus", "Light State Updated: %s", light_on ? "ON" : "OFF");
             }
             */
+          }
 
 # ================= 全局变量 =================
 globals:
@@ -106,11 +124,9 @@ switch:
           id: is_sending
           value: 'true'
       
-      # --- 发送 Packet 1 (ON) ---
       - lambda: |-
           std::vector<uint8_t> pkt1 = {
-            0x11, 0x4D, // Company ID: 0x4D11 (Little Endian)
-            0x19, 0x1C, 0x48, 0x80, 0x27, 0x70, 0x00, 0x00, 
+            0x11, 0x4D, 0x19, 0x1C, 0x48, 0x80, 0x27, 0x70, 0x00, 0x00, 
             0x01, 0x71, 0x70, 0x06, 0x5F, 0xC8, 0x6F, 0xB8, 
             0x48, 0x48, 0xA7, 0xF0, 0x80, 0x80, 0x97, 0x2F
           };
@@ -119,11 +135,9 @@ switch:
 
       - delay: 120ms
 
-      # --- 发送 Packet 2 (OFF) ---
       - lambda: |-
           std::vector<uint8_t> pkt2 = {
-            0x11, 0x4D, // Company ID: 0x4D11 (Little Endian)
-            0x19, 0x1A, 0x48, 0x80, 0x27, 0x70, 0x00, 0x00, 
+            0x11, 0x4D, 0x19, 0x1A, 0x48, 0x80, 0x27, 0x70, 0x00, 0x00, 
             0x01, 0x26, 0x27, 0x70, 0x70, 0x00, 0x5F, 0xC8, 
             0x6F, 0xB8, 0x48, 0x48, 0xA7, 0xF0, 0x80, 0x82
           };
@@ -131,16 +145,11 @@ switch:
           ESP_LOGI("BLE", "Sending Packet 2 (OFF)");
 
       - delay: 120ms
-
-      # --- 清空 ---
       - script.execute: clear_broadcast
-      
-      # 自动复位开关
       - delay: 500ms
       - switch.turn_off: midea_switch
 
     turn_off_action:
-      # 关闭动作也发送同样的切换序列
       - globals.set:
           id: is_sending
           value: 'true'
@@ -174,4 +183,3 @@ binary_sensor:
     name: "Midea Light Status"
     id: midea_light
     device_class: light
-    # ✅ 已删除 restore_mode，因为 binary_sensor.template 不支持此参数
