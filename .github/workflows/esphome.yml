@@ -17,13 +17,18 @@ jobs:
         with:
           yaml-file: midea-send-only.yaml
 
-      - name: Copy firmware files
+      - name: 收集所有 .bin 固件
         run: |
-          mkdir output
-          cp ./.esphome/build/midea-send-only/.pioenvs/midea-send-only/*.bin output/
+          mkdir -p output
+          # 递归查找构建目录下的所有 .bin 文件，扁平化复制到 output 目录
+          find .esphome/build/ -type f -name "*.bin" -exec cp -f {} output/ \;
+          echo "✅ 已收集完整固件列表:"
+          ls -1 output/
 
-      - name: Upload firmware
+      - name: 上传完整固件包
         uses: actions/upload-artifact@v4
         with:
-          name: firmware
-          path: output/*.bin
+          name: midea-fan-light-all-bins
+          path: output/
+          retention-days: 30
+          if-no-files-found: error
