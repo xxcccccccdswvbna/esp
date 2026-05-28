@@ -12,7 +12,6 @@ logger:
 api:
   encryption:
     key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
-  reboot_timeout: 1h
 
 ota:
   - platform: esphome
@@ -22,14 +21,13 @@ wifi:
   ssid: "CC"
   password: "chen1122"
 
-  manual_ip:
-    static_ip: 192.168.6.72
-    gateway: 192.168.6.1
-    subnet: 255.255.255.0
-
 captive_portal:
 
-esp32_ble_tracker:
+esp32_ble:
+
+esp32_ble_server:
+  id: ble_server
+  manufacturer_data: []
 
 globals:
   - id: is_sending
@@ -37,69 +35,76 @@ globals:
     restore_value: no
     initial_value: 'false'
 
+script:
+  - id: clear_broadcast
+    then:
+      - delay: 300ms
+      - lambda: |-
+          std::vector<uint8_t> empty = {};
+          id(ble_server).set_manufacturer_data(empty);
+      - globals.set:
+          id: is_sending
+          value: 'false'
+
 button:
+
   - platform: template
     name: "Midea Light Toggle"
-    id: midea_light_toggle
-
+    id: light_toggle
     on_press:
       - if:
           condition:
             lambda: 'return id(is_sending);'
           then:
             - logger.log: "BLE busy"
-
           else:
             - globals.set:
                 id: is_sending
                 value: 'true'
 
             - lambda: |-
-                #include "esp_gap_ble_api.h"
-
-                uint8_t packet1[] = {
-                  0x1F,0x02,0x01,0x06,
-                  0x1B,0xFF,0x11,0x4D,
+                std::vector<uint8_t> mfr_data = {
                   0x19,0x1C,0x48,0x80,0x27,0x70,0x00,0x00,
                   0x01,0x71,0x70,0x06,0x5F,0xC8,0x6F,0xB8,
                   0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x2F
                 };
+                id(ble_server).set_manufacturer_data(mfr_data);
 
-                esp_ble_gap_config_adv_data_raw(
-                  packet1,
-                  sizeof(packet1)
-                );
-
-                esp_ble_gap_start_advertising(nullptr);
-
-                ESP_LOGI("BLE", "Sent packet1");
-
-            - delay: 250ms
+            - delay: 200ms
 
             - lambda: |-
-                #include "esp_gap_ble_api.h"
-
-                uint8_t packet2[] = {
-                  0x1F,0x02,0x01,0x06,
-                  0x1B,0xFF,0x11,0x4D,
+                std::vector<uint8_t> mfr_data = {
                   0x19,0x1A,0x48,0x80,0x27,0x70,0x00,0x00,
                   0x01,0x26,0x27,0x70,0x70,0x00,0x5F,0xC8,
                   0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x82
                 };
+                id(ble_server).set_manufacturer_data(mfr_data);
 
-                esp_ble_gap_config_adv_data_raw(
-                  packet2,
-                  sizeof(packet2)
-                );
+            - script.execute: clear_broadcast
 
-                ESP_LOGI("BLE", "Sent packet2");
 
-            - delay: 1200ms
 
-            - lambda: |-
-                #include "esp_gap_ble_api.h"
-                esp_ble_gap_stop_advertising();
+  - platform: template
+    name: "Midea Fan Toggle"
+    id: fan_toggle
+    on_press:
 
-            - globals.set:
-                id: is_sending
-                value: 'false'
+      - lambda: |-
+          std::vector<uint8_t> mfr_data = {
+            0x19,0x16,0x48,0x80,0x27,0x70,0x00,0x00,
+            0x01,0xF1,0x80,0x89,0x97,0x27,0x27,0x70,
+            0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x43
+          };
+          id(ble_server).set_manufacturer_data(mfr_data);
+
+      - delay: 200ms
+
+      - lambda: |-
+          std::vector<uint8_t> mfr_data = {
+            0x19,0x1F,0x48,0x80,0x27,0x70,0x00,0x00,
+            0x01,0x5E,0xC8,0x6F,0xB8,0x48,0x48,0xA7,
+            0xF0,0x80,0x80,0x97,0x27,0x27,0x70,0x72
+          };
+          id(ble_server).set_manufacturer_data(mfr_data);
+
+      - script.execute: clear_broadcast
