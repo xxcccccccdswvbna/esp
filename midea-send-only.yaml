@@ -1,11 +1,9 @@
 esphome:
   name: midea-fan-light-pro
   friendly_name: Midea Fan Light Pro
-  platformio_options:
-    board_build.flash_mode: dio
 
 esp32:
-  board: esp32-c3-devkitm-1 # 根据你的硬件修改，如果是 ESP32Dev 请改回 esp32dev
+  board: esp32-c3-devkitm-1 # 请确认你的板子型号，如果是 ESP32 DevKit 请改为 esp32dev
   framework:
     type: esp-idf
 
@@ -41,12 +39,12 @@ esp32_ble_tracker:
     window: 150ms
     active: false
   
-  # 监听 Manufacturer Data
+  # 【关键修复】这里使用列表结构来过滤 Manufacturer ID
   on_ble_manufacturer_data_advertise:
-    - manufacturer_id: "0x4D11" # 美的 Company ID
+    - manufacturer_id: 0x4D11  # 注意：这里是十六进制整数，不是字符串
       then:
         - lambda: |-
-            // !!! 替换为你的风扇灯 MAC 地址 !!!
+            // !!! 替换为你的风扇灯 MAC 地址 (小写，带冒号) !!!
             if (x.address_str != "00:00:70:27:80:48") {
               return;
             }
@@ -60,8 +58,6 @@ esp32_ble_tracker:
             if (x.data.size() < 2) return;
 
             // 3. 解析状态位 (根据你之前的抓包分析)
-            // 注意：由于你说数据是随机的，这里仅做示例性解析
-            // 假设第2个字节 (index 1) 包含状态信息
             uint8_t status_byte = x.data[1];
             
             // 打印调试日志，方便你在 HA 中观察规律
@@ -72,7 +68,7 @@ esp32_ble_tracker:
             bool light_on = false;
             if (status_byte == 0x1C || status_byte == 0x1F) light_on = true;
             else if (status_byte == 0x1A || status_byte == 0x16) light_on = false;
-            else return; // 未知状态，不更新
+            else return; 
 
             if (id(midea_light).state != light_on) {
               id(midea_light).publish_state(light_on);
@@ -145,7 +141,7 @@ switch:
       - switch.turn_off: midea_switch
 
     turn_off_action:
-      # 关闭动作也发送同样的切换序列，因为这是“Toggle”逻辑
+      # 关闭动作也发送同样的切换序列
       - globals.set:
           id: is_sending
           value: 'true'
@@ -173,7 +169,7 @@ switch:
       - delay: 500ms
       - switch.turn_off: midea_switch
 
-# ================= 状态传感器 (可选，需调试后启用) =================
+# ================= 状态传感器 (可选) =================
 binary_sensor:
   - platform: template
     name: "Midea Light Status"
