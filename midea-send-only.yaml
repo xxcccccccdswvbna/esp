@@ -45,22 +45,22 @@ logger:
     wifi: WARN
     api: WARN
 
-# 3️⃣ 网络看门狗（每60秒检查，连续3次断网才重启，防路由抖动）
 interval:
   - interval: 60s
     then:
       - lambda: |-
           static int fail_count = 0;
-          if (!WiFi.isConnected()) {
+          // ESPHome 2026.x 标准写法
+          if (!wifi::is_connected()) {
             fail_count++;
             ESP_LOGW("Watchdog", "WiFi断连 (%d/3)", fail_count);
             if (fail_count >= 3) {
               ESP_LOGW("Watchdog", "连续断网，执行安全重启");
-              delay(1000);  // 留给日志输出时间
-              ESP.restart();  // ESP-IDF 原生安全重启
+              delay(1000);
+              App.reboot();  // 替代 ESP.restart()
             }
           } else {
-            fail_count = 0;  // 网络恢复则清零计数
+            fail_count = 0;
           }
 
 esp32_ble:
@@ -370,26 +370,31 @@ button:
 # ========== Dev3 状态监听 (修复版：含调试日志+防未知) ==========
 esp32_ble_tracker:
   scan_parameters:
-    interval: 300ms  # 加快扫描，确保不漏包
+    interval: 300ms
     window: 200ms
     active: false
-  on_ble_advertise:  # 改用全局广播监听，绕过 manufacturer_id 预过滤
+  on_ble_advertise:
     then:
       - lambda: |-
-          // 1. 基础过滤：必须是厂商数据且长度够
-          if (!x.get_manufacturer_data().empty() && x.get_manufacturer_data().size() >= 20) {
-            const auto& mfr = x.get_manufacturer_data();
-            // mfr[0~1] 是 Company ID，mfr[2] 开始是负载
-            if (mfr[0] == 0x4D && mfr[1] == 0x13 && mfr[2] == 0x21) {
+          // 新API：获取厂商数据列表 (自动剥离 Company ID)
+          const auto& mfr_datas = x.get_manufacturer_datas();
+          if (mfr_datas.empty()) return;
+          
+          for (const auto& mfr_entry : mfr_datas) {
+            // 匹配 Company ID 0x134D
+            if (mfr_entry.uuid.to_uint16().value_or(0) == 0x134D && mfr_entry.data.size() >= 18) {
+              const auto& mfr = mfr_entry.data;
+              
+              // 新API已剥离前2字节(4D 13)，所以 mfr[0] 对应原协议的 0x21
+              if (mfr[0] != 0x21) return;
+              
               ESP_LOGI("Dev3_Debug", "✅ 捕获到设备广播! Size=%d", mfr.size());
               
-              // 暂时注释 MAC 过滤，先跑通逻辑。确认正常后可取消注释
-              // if (mfr[4]!=0x48 || mfr[5]!=0x80 || mfr[6]!=0x27 || mfr[7]!=0x70) return;
-              
-              bool power_on = (mfr[11] == 0x01);
-              bool fan_running = (mfr[20] & 0x01);
-              uint8_t fan_gear_idx = mfr[21];
-              uint16_t brt_raw = (mfr[16] << 8) | mfr[17];
+              // 索引整体 -2 以适配新API
+              bool power_on = (mfr[9] == 0x01);
+              bool fan_running = (mfr[18] & 0x01);
+              uint8_t fan_gear_idx = mfr[19];
+              uint16_t brt_raw = (mfr[14] << 8) | mfr[15];
               int brt_pct = (brt_raw == 0xFFFF) ? 100 : (int)(brt_raw / 655.35);
               
               id(dev3_power).publish_state(power_on);
@@ -399,10 +404,9 @@ esp32_ble_tracker:
               
               ESP_LOGI("Dev3_State", "Power=%d Fan=%d(Idx%d) BRT=%d%%", 
                        power_on, fan_running, fan_gear_idx, brt_pct);
-              return; // 匹配成功，结束
+              return;
             }
           }
-
 # ========== Dev3 实体 (纯净版) ==========
 binary_sensor:
   - platform: template
