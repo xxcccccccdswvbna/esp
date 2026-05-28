@@ -105,12 +105,12 @@ script:
           then:
             - globals.set: {id: is_sending, value: 'true'}
             - lambda: |-
-                auto cmd = id(cmd_data).template std::vector<uint8_t>();
-                auto end = id(end_data).template std::vector<uint8_t>();
+                auto cmd = id(cmd_data);
+                auto end = id(end_data);
                 id(ble_server).set_manufacturer_data(cmd);
             - delay: 200ms
             - lambda: |-
-                id(ble_server).set_manufacturer_data(id(end_data).template std::vector<uint8_t>());
+                id(ble_server).set_manufacturer_data(end);
             - delay: 200ms
             - lambda: |-
                 id(ble_server).set_manufacturer_data({});
