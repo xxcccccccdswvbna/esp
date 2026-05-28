@@ -211,8 +211,9 @@ switch:
   - platform: template
     name: "Midea Light State"
     id: sw_light_state
-    optimistic: false
+    optimistic: true
     entity_category: diagnostic
+    icon: mdi:ceiling-light
 
 sensor:
   - platform: template
