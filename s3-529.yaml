@@ -347,74 +347,62 @@ button:
 # ========== 新增：新版协议设备 (Dev3) 状态监听 ==========
 esp32_ble_tracker:
   scan_parameters:
-    interval: 320ms
-    window: 300ms
+    interval: 300ms
+    window: 280ms
     active: false
     continuous: true
 
   on_ble_advertise:
     - then:
         - lambda: |-
-            std::string mac = x.address_str();
+            if (x.address_str() != "00:00:70:27:80:48") return;
 
-            // 只监听你的设备
-            if (mac != "00:00:70:27:80:48") return;
+            auto datas = x.get_manufacturer_datas();
 
-            auto data = x.get_manufacturer_datas();
+            for (auto md : datas) {
 
-            if (data.size() == 0) return;
-
-            for (auto md : data) {
-
-              if (md.uuid.to_string() != "0x134D") {
-                continue;
-              }
+              if (md.uuid.to_string() != "0x134D") continue;
 
               auto payload = md.data;
 
-              if (payload.size() < 20) {
-                ESP_LOGW(
-                  "midea_ble",
-                  "short packet len=%d",
-                  payload.size()
-                );
-                continue;
-              }
+              if (payload.size() < 22) return;
 
-              ESP_LOGI(
-                "midea_ble",
-                "recv mac=%s len=%d",
-                mac.c_str(),
-                payload.size()
-              );
-
-              bool power_on = payload[9] == 0x01;
+              bool power_on =
+                  payload[11] == 0x01;
 
               bool fan_running =
-                  (payload[18] & 0x01) != 0;
+                  payload[20] == 0x13;
 
-              uint8_t fan_gear_idx =
-                  payload[19];
+              int fan_speed =
+                  fan_running
+                    ? payload[21] + 1
+                    : 0;
 
-              uint16_t brt_raw =
+              uint16_t br_raw =
                   ((uint16_t)payload[14] << 8)
                   | payload[15];
 
-              int brightness =
-                  brt_raw == 0xFFFF
-                    ? 100
-                    : (int)(brt_raw / 655.35f);
+              int brightness = 0;
 
-              id(dev3_power).publish_state(power_on);
+              if (br_raw == 0xFFFF) {
+                brightness = 100;
+              } else {
+                brightness =
+                  round(
+                    br_raw / 65535.0 * 100
+                  );
+              }
+
+              id(dev3_power).publish_state(
+                power_on
+              );
 
               id(dev3_fan_running).publish_state(
                 fan_running
               );
 
               id(dev3_fan_speed).publish_state(
-                fan_running
-                  ? fan_gear_idx + 1
-                  : 0
+                fan_speed
               );
 
               id(dev3_brightness).publish_state(
@@ -423,10 +411,10 @@ esp32_ble_tracker:
 
               ESP_LOGI(
                 "midea_ble",
-                "Power=%d Fan=%d Speed=%d Brightness=%d",
+                "power=%d fan=%d speed=%d brightness=%d",
                 power_on,
                 fan_running,
-                fan_gear_idx + 1,
+                fan_speed,
                 brightness
               );
             }
