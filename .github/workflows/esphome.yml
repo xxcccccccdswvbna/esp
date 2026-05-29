@@ -1,54 +1,53 @@
-name: Build ESPHome
+name: Build Changed ESPHome
 
 on:
   workflow_dispatch:
   push:
+    paths:
+      - "**/*.yaml"
 
 jobs:
-  discover:
+  detect:
     runs-on: ubuntu-latest
     outputs:
-      files: ${{ steps.find.outputs.files }}
+      files: ${{ steps.changed.outputs.files }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
-      - name: 查找所有 YAML
-        id: find
+      - name: 检测变更 YAML
+        id: changed
         run: |
-          FILES=$(find . -maxdepth 1 -name "*.yaml" -printf '%f\n' | jq -R -s -c 'split("\n")[:-1]')
+          FILES=$(git diff --name-only HEAD^ HEAD \
+            | grep '\.yaml$' \
+            | jq -R -s -c 'split("\n")[:-1]')
+
           echo "files=$FILES" >> $GITHUB_OUTPUT
-          echo "找到以下配置文件:"
           echo "$FILES"
 
   build:
-    needs: discover
+    needs: detect
+    if: needs.detect.outputs.files != '[]'
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        yaml: ${{ fromJson(needs.discover.outputs.files) }}
+        yaml: ${{ fromJson(needs.detect.outputs.files) }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Build ${{ matrix.yaml }}
+      - name: Build
         uses: esphome/build-action@v6
         with:
           yaml-file: ${{ matrix.yaml }}
-
-      - name: 收集固件
-        run: |
-          mkdir -p output/${{ matrix.yaml }}
-          find . -type f \( -name "*.bin" -o -name "manifest.json" \) \
-            -exec cp -f {} output/${{ matrix.yaml }}/ \;
 
       - name: 上传固件
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.yaml }}-firmware
-          path: output/${{ matrix.yaml }}/
+          path: .esphome/build/
           retention-days: 30
