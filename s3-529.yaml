@@ -7,12 +7,14 @@ esp32:
   framework:
     type: esp-idf
     version: recommended
+    sdkconfig_options:
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
 
 logger:
-  level: DEBUG
+  level: INFO
   logs:
-    esp32_ble_tracker: INFO
-    esp32_ble: INFO
+    esp32_ble: WARN
+    esp32_ble_tracker: WARN
 
 api:
   encryption:
