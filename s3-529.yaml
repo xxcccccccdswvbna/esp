@@ -21,7 +21,8 @@ logger:
   logs:
     esp32_ble: WARN
     esp32_ble_tracker: WARN
-    midea_ble: INFO  # 保留自定义解析日志可见
+    BLE_RAW: INFO   # ← 必须设为 INFO，否则 Found 日志会被隐藏
+    midea_ble: INFO # ← 必须设为 INFO，否则解析日志会被隐藏
 
 api:
   encryption:
@@ -331,18 +332,23 @@ button:
 # ========== 稳定版 Dev3 状态监听 ==========
 esp32_ble_tracker:
   scan_parameters:
-    interval: 800ms   # ✅ 平衡响应与稳定性，避开 WiFi 心跳冲突
-    window: 800ms
+    interval: 1100ms  # 降低频率，减少与 WiFi 心跳冲突
+    window: 1100ms    # ✅ 关键：100% 占空比连续扫描
     active: false
     continuous: true
+    duration: 0s      # ✅ 永不超时
   on_ble_advertise:
     then:
       - lambda: |-
-          // 1. MAC 过滤
+          // 1. 打印所有设备（强制可见）
+          ESP_LOGI("BLE_RAW", ">>> Found: %s RSSI=%d", 
+                   x.address_str().c_str(), x.get_rssi());
+          
+          // 2. MAC 过滤
           std::string mac = x.address_str();
           if (mac != "00:00:70:27:80:48") return;
           
-          // 2. 厂商数据过滤
+          // 3. 厂商数据过滤
           auto mfrs = x.get_manufacturer_datas();
           if (mfrs.empty()) return;
           
@@ -352,20 +358,21 @@ esp32_ble_tracker:
             if (p.size() < 20) continue;
             if (p[0] != 0x21) continue;  // 协议头校验
             
-            // 3. 解析字段 (已校准)
+            // 4. 解析字段 (已校准)
             bool power_on = (p[9] == 0x01);
             bool fan_running = ((p[10] & 0x01) != 0);
             uint8_t fan_idx = p[19];
             uint16_t brt_raw = ((uint16_t)p[14] << 8) | p[15];
             int brightness = (brt_raw == 0xFFFF) ? 100 : (int)(brt_raw / 655.35f);
             
-            // 4. 发布状态
+            // 5. 发布状态
             id(dev3_power).publish_state(power_on);
             id(dev3_fan_running).publish_state(fan_running);
             id(dev3_fan_speed).publish_state(fan_running ? (fan_idx + 1) : 0);
             id(dev3_brightness).publish_state(brightness);
             
-            ESP_LOGI("midea_ble", "Dev3: Power=%d Fan=%d(Idx%d) BRT=%d%%", power_on, fan_running, fan_idx, brightness);
+            ESP_LOGI("midea_ble", "✅ Dev3 Update: Power=%d Fan=%d(Idx%d) BRT=%d%%", 
+                     power_on, fan_running, fan_idx, brightness);
           }
 
 # ========== 状态实体 ==========
