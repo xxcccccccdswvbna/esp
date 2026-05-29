@@ -347,10 +347,10 @@ button:
 # ========== 新增：新版协议设备 (Dev3) 状态监听 ==========
 esp32_ble_tracker:
   scan_parameters:
-    interval: 320ms
-    window: 300ms
     active: false
     continuous: true
+    interval: 320ms
+    window: 300ms
 
   on_ble_advertise:
     then:
@@ -362,25 +362,61 @@ esp32_ble_tracker:
 
             auto p = md.data;
 
-            if (p.size() < 23)
+            // 至少 20 字节
+            if (p.size() < 20)
               continue;
 
-            uint8_t mode =
-              p[p.size() - 3];
+            // 协议头必须是 21 00（对应完整包里的 8153 后半段）
+            // 不强校验也行，这里仅过滤异常包
+            if (p[0] != 0x21)
+              continue;
 
-            uint8_t speed_raw =
-              p[p.size() - 2];
+            /*
+             * 对应 python:
+             * he = v.hex()
+             *
+             * mode          = he[22:24]
+             * brightness    = he[28:30]
+             * color_temp    = he[30:32]
+             * timer         = he[32:36]
+             * fan_speed_raw = he[-4:-2]
+             */
+
+            uint8_t light_byte   = p[7];
+            uint8_t brightness_b = p[11];
+            uint8_t color_b      = p[12];
+            uint16_t timer_raw   = (p[13] << 8) | p[14];
+            uint8_t mode         = p[5];
+            uint8_t fan_raw      = p[18];
 
             bool light_on =
-              mode & 0x02;
+              mode & 0x01;
+
+            bool fan_reverse =
+              mode & 0x20;
 
             bool fan_running =
-              mode & 0x01;
+              !(mode == 0x10 || mode == 0x11);
 
             int fan_speed =
               fan_running
-                ? speed_raw + 1
+                ? fan_raw + 1
                 : 0;
+
+            int brightness =
+              round(
+                brightness_b
+                * 100.0
+                / 255.0
+              );
+
+            int color_temp =
+              round(
+                2700 +
+                (6500 - 2700)
+                * color_b
+                / 255.0
+              );
 
             id(dev3_power)
               .publish_state(light_on);
@@ -391,13 +427,26 @@ esp32_ble_tracker:
             id(dev3_fan_speed)
               .publish_state(fan_speed);
 
+            id(dev3_brightness)
+              .publish_state(brightness);
+
+            id(dev3_color_temp)
+              .publish_state(color_temp);
+
+            id(dev3_timer)
+              .publish_state(timer_raw);
+
             ESP_LOGI(
               "midea_ble",
-              "mode=%02X light=%d fan=%d speed=%d",
+              "mode=%02X light=%d fan=%d reverse=%d speed=%d bright=%d color=%d timer=%d",
               mode,
               light_on,
               fan_running,
-              fan_speed
+              fan_reverse,
+              fan_speed,
+              brightness,
+              color_temp,
+              timer_raw
             );
           }
 
@@ -415,4 +464,22 @@ sensor:
     name: "Dev3 Fan Speed"
     id: dev3_fan_speed
     unit_of_measurement: "档"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Dev3 Brightness"
+    id: dev3_brightness
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Dev3 Color Temp"
+    id: dev3_color_temp
+    unit_of_measurement: "K"
+    accuracy_decimals: 0
+
+  - platform: template
+    name: "Dev3 Timer"
+    id: dev3_timer
+    unit_of_measurement: "min"
     accuracy_decimals: 0
