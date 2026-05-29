@@ -375,7 +375,7 @@ esp32_ble_tracker:
     window: 1100ms
     active: false
     continuous: true
-    duration: 3300ms  # ✅ 必须 ≥ 3×interval，覆盖 3 个广播频道
+    duration: 3.3s    # ✅ 改为秒单位，3.3 秒 = 3300 毫秒，覆盖 3 个广播频道
   on_ble_advertise:
     then:
       - lambda: |-
@@ -439,7 +439,6 @@ esp32_ble_tracker:
             ESP_LOGI("midea_ble", "✅ Dev3: Power=%d Fan=%d(Idx%d) BRT=%d%%", 
                      power_on, fan_running, fan_idx, brightness);
           }
-
 # ========== Dev3 状态实体 ==========
 binary_sensor:
   - platform: template
