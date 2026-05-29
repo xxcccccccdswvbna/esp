@@ -1,20 +1,27 @@
 esphome:
   name: midea-dual-control
   friendly_name: Midea Dual Control
+  # ✅ 启动延迟：让 WiFi/BLE 协议栈稳定后再初始化广播，避免抢占射频
+  on_boot:
+    - priority: 600
+      then:
+        - delay: 2s
 
 esp32:
   board: esp32-s3-devkitc-1
   framework:
     type: esp-idf
     version: recommended
-    sdkconfig_options:
-      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+  sdkconfig_options:
+    CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+    CONFIG_FREERTOS_HZ: 1000
 
 logger:
-  level: DEBUG
+  level: INFO
   logs:
-    BLE_Debug: DEBUG
-    midea_ble: INFO
+    esp32_ble: WARN
+    esp32_ble_tracker: WARN
+    midea_ble: INFO  # 保留自定义解析日志可见
 
 api:
   encryption:
@@ -30,8 +37,6 @@ wifi:
   password: "chen1122"
   power_save_mode: none
 
-# ... 其余 number/button/interval 配置完全不变，直接保留 ...
-
 esp32_ble:
   io_capability: none
 
@@ -39,7 +44,7 @@ esp32_ble_server:
   id: ble_server
   manufacturer_data: []
 
-# ========== 全局变量 (非阻塞架构核心) ==========
+# ========== 全局变量 ==========
 globals:
   - id: last_cmd_time
     type: uint32_t
@@ -51,9 +56,8 @@ globals:
     type: std::vector<uint8_t>
     initial_value: 'std::vector<uint8_t>{}'
 
-# ========== 滑块控制区 (非阻塞动作链) ==========
+# ========== 滑块：Dev1/Dev2 亮度 & 色温 ==========
 number:
-  # 🟦 Dev1 亮度
   - platform: template
     name: "Dev1 Light Brightness"
     id: dev1_brt
@@ -88,7 +92,6 @@ number:
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
 
-  # 🟦 Dev1 色温
   - platform: template
     name: "Dev1 Light Color Temp"
     id: dev1_ct
@@ -121,8 +124,6 @@ number:
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
 
-
-  # 🟧 Dev2 亮度
   - platform: template
     name: "Dev2 Light Brightness"
     id: dev2_brt
@@ -157,7 +158,6 @@ number:
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
 
-  # 🟧 Dev2 色温
   - platform: template
     name: "Dev2 Light Color Temp"
     id: dev2_ct
@@ -188,26 +188,17 @@ number:
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
 
-# ========== 下拉选择控制区（替代滑块）==========
+# ========== 下拉菜单：Dev1/Dev2 风扇档位 ==========
 select:
-  # 🟦 Dev1 风扇档位（下拉菜单）
   - platform: template
     name: "Dev1 Fan Speed Select"
     id: dev1_fan_select
     icon: mdi:fan-speed
-    options:
-      - "1 档"
-      - "2 档"
-      - "3 档"
-      - "4 档"
-      - "5 档"
-      - "6 档"
+    options: ["1 档", "2 档", "3 档", "4 档", "5 档", "6 档"]
     optimistic: true
     set_action:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return;
-          id(last_cmd_time) = millis();
-          
+          if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
           int lvl = x == "1 档" ? 1 : x == "2 档" ? 2 : x == "3 档" ? 3 : x == "4 档" ? 4 : x == "5 档" ? 5 : 6;
           std::vector<uint8_t> p, e;
           switch(lvl) {
@@ -225,24 +216,15 @@ select:
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
 
-  # 🟧 Dev2 风扇档位（下拉菜单）
   - platform: template
     name: "Dev2 Fan Speed Select"
     id: dev2_fan_select
     icon: mdi:fan-speed
-    options:
-      - "1 档"
-      - "2 档"
-      - "3 档"
-      - "4 档"
-      - "5 档"
-      - "6 档"
+    options: ["1 档", "2 档", "3 档", "4 档", "5 档", "6 档"]
     optimistic: true
     set_action:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return;
-          id(last_cmd_time) = millis();
-          
+          if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
           int lvl = x == "1 档" ? 1 : x == "2 档" ? 2 : x == "3 档" ? 3 : x == "4 档" ? 4 : x == "5 档" ? 5 : 6;
           std::vector<uint8_t> p, e;
           switch(lvl) {
@@ -259,7 +241,8 @@ select:
       - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt));'
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
-# ========== 按钮控制区 (同步优化) ==========
+
+# ========== 按钮：开关 & 反转 ==========
 button:
   - platform: template
     name: "Dev1 Light Toggle"
@@ -344,73 +327,54 @@ button:
       - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt));'
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
-# ========== 新增：新版协议设备 (Dev3) 状态监听 ==========
-# ========== 新版协议设备 (Dev3) 状态监听 ==========
+
+# ========== 稳定版 Dev3 状态监听 ==========
 esp32_ble_tracker:
   scan_parameters:
+    interval: 800ms   # ✅ 平衡响应与稳定性，避开 WiFi 心跳冲突
+    window: 800ms
     active: false
     continuous: true
-    interval: 320ms
-    window: 300ms
-
   on_ble_advertise:
     then:
       - lambda: |-
-          // 调试日志：打印所有设备
-          ESP_LOGD("BLE_Debug", "Found: %s", x.address_str().c_str());
-          
-          // MAC 过滤
+          // 1. MAC 过滤
           std::string mac = x.address_str();
           if (mac != "00:00:70:27:80:48") return;
           
-          auto mfr_datas = x.get_manufacturer_datas();
-          if (mfr_datas.empty()) return;
+          // 2. 厂商数据过滤
+          auto mfrs = x.get_manufacturer_datas();
+          if (mfrs.empty()) return;
           
-          for (const auto &md : mfr_datas) {
-            // 检查 Company ID 0x134D
+          for (const auto &md : mfrs) {
             if (md.uuid != esp32_ble_tracker::ESPBTUUID::from_uint16(0x134D)) continue;
+            auto &p = md.data;
+            if (p.size() < 20) continue;
+            if (p[0] != 0x21) continue;  // 协议头校验
             
-            auto payload = md.data;
-            if (payload.size() < 22) {
-              ESP_LOGD("BLE_Debug", "Payload too short: %d", payload.size());
-              continue;
-            }
-            
-            // 打印调试信息
-            ESP_LOGD("BLE_Debug", "Payload[0-21]: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
-              payload[0], payload[1], payload[2], payload[3], payload[4], payload[5],
-              payload[6], payload[7], payload[8], payload[9], payload[10], payload[11],
-              payload[12], payload[13], payload[14], payload[15], payload[16], payload[17],
-              payload[18], payload[19], payload[20], payload[21]);
-            
-            // 协议头检查
-            if (payload[0] != 0x21) continue;
-            
-            // ✅ 校准后的索引 (payload 已剥离 2 字节 Company ID)
-            bool power_on = (payload[9] == 0x01);                    // 开关: 索引 9
-            bool fan_running = ((payload[10] & 0x01) != 0);          // 风扇运行: 索引 10 的最低位
-            uint8_t fan_gear_idx = payload[19];                       // 档位索引: 索引 19
-            uint16_t brt_raw = ((uint16_t)payload[14] << 8) | payload[15];  // 亮度: 索引 14-15
+            // 3. 解析字段 (已校准)
+            bool power_on = (p[9] == 0x01);
+            bool fan_running = ((p[10] & 0x01) != 0);
+            uint8_t fan_idx = p[19];
+            uint16_t brt_raw = ((uint16_t)p[14] << 8) | p[15];
             int brightness = (brt_raw == 0xFFFF) ? 100 : (int)(brt_raw / 655.35f);
             
-            // ✅ 发布状态 (注意：用 . 不是 ->)
+            // 4. 发布状态
             id(dev3_power).publish_state(power_on);
             id(dev3_fan_running).publish_state(fan_running);
-            id(dev3_fan_speed).publish_state(fan_running ? (fan_gear_idx + 1) : 0);
+            id(dev3_fan_speed).publish_state(fan_running ? (fan_idx + 1) : 0);
             id(dev3_brightness).publish_state(brightness);
             
-            ESP_LOGI("midea_ble", "✅ Power=%d Fan=%d(Idx%d) BRT=%d%% (Raw: %04X)",
-                     power_on, fan_running, fan_gear_idx, brightness, brt_raw);
+            ESP_LOGI("midea_ble", "Dev3: Power=%d Fan=%d(Idx%d) BRT=%d%%", power_on, fan_running, fan_idx, brightness);
           }
 
-# ========== Dev3 状态实体 (只读) ==========
+# ========== 状态实体 ==========
 binary_sensor:
   - platform: template
     name: "Dev3 Light Power"
     id: dev3_power
     device_class: light
     icon: mdi:ceiling-light
-
   - platform: template
     name: "Dev3 Fan Running"
     id: dev3_fan_running
@@ -424,10 +388,23 @@ sensor:
     unit_of_measurement: "档"
     accuracy_decimals: 0
     icon: mdi:numeric
-
   - platform: template
     name: "Dev3 Brightness"
     id: dev3_brightness
     unit_of_measurement: "%"
     accuracy_decimals: 0
     icon: mdi:brightness-percent
+
+# ========== 网络看门狗 ==========
+interval:
+  - interval: 60s
+    then:
+      - lambda: |-
+          static uint32_t last_ok = 0;
+          if (network::is_connected()) {
+            last_ok = millis();
+          } else if (millis() - last_ok > 180000) {
+            ESP_LOGW("Watchdog", "Network lost >3min, rebooting...");
+            delay(100);
+            App.reboot();
+          }
