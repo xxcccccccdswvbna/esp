@@ -1,0 +1,40 @@
+esphome:
+  name: ble-min-test
+  friendly_name: BLE Min Test
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+    version: recommended
+
+logger:
+  level: DEBUG
+  logs:
+    esp32_ble: DEBUG
+    esp32_ble_tracker: DEBUG
+
+wifi:
+  ssid: "CC"
+  password: "chen1122"
+  power_save_mode: none
+
+# ✅ 最小蓝牙配置
+esp32_ble:
+  io_capability: none
+
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 100ms
+    window: 100ms
+    active: true
+    continuous: true
+  on_ble_advertise:
+    then:
+      - lambda: |-
+          ESP_LOGI("MIN_TEST", ">>> Found: %s RSSI=%d", 
+                   x.address_str().c_str(), x.get_rssi());
+          for (const auto &md : x.get_manufacturer_datas()) {
+            ESP_LOGI("MIN_TEST", "    UUID: %s | Len: %d", 
+                     md.uuid.to_string().c_str(), md.data.size());
+          }
