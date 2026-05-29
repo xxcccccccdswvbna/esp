@@ -11,10 +11,10 @@ esp32:
       CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
 
 logger:
-  level: INFO
+  level: DEBUG
   logs:
-    esp32_ble: WARN
-    esp32_ble_tracker: WARN
+    BLE_Debug: DEBUG
+    midea_ble: INFO
 
 api:
   encryption:
@@ -345,6 +345,7 @@ button:
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
 # ========== 新增：新版协议设备 (Dev3) 状态监听 ==========
+# ========== 新版协议设备 (Dev3) 状态监听 ==========
 esp32_ble_tracker:
   scan_parameters:
     active: false
@@ -355,86 +356,78 @@ esp32_ble_tracker:
   on_ble_advertise:
     then:
       - lambda: |-
-          for (auto md : x.get_manufacturer_datas()) {
-
-            // ✅ ESPHome 1.11+ 正确 UUID 比较方式
-            if (md.uuid != esp32_ble_tracker::ESPBTUUID::from_uint16(0x134D))
+          // 调试日志：打印所有设备
+          ESP_LOGD("BLE_Debug", "Found: %s", x.address_str().c_str());
+          
+          // MAC 过滤
+          std::string mac = x.address_str();
+          if (mac != "00:00:70:27:80:48") return;
+          
+          auto mfr_datas = x.get_manufacturer_datas();
+          if (mfr_datas.empty()) return;
+          
+          for (const auto &md : mfr_datas) {
+            // 检查 Company ID 0x134D
+            if (md.uuid != esp32_ble_tracker::ESPBTUUID::from_uint16(0x134D)) continue;
+            
+            auto payload = md.data;
+            if (payload.size() < 22) {
+              ESP_LOGD("BLE_Debug", "Payload too short: %d", payload.size());
               continue;
-
-            auto &p = md.data;
-
-            // 防止越界
-            if (p.size() < 16)
-              continue;
-
-            uint8_t mode = p[5];
-
-            uint8_t brightness_b = p[11];
-            uint8_t color_b = p[12];
-
-            uint16_t timer_raw = (p[13] << 8) | p[14];
-
-            // ⚠️ 防止长度变化导致越界
-            uint8_t fan_raw = p[p.size() > 16 ? p.size() - 2 : 15];
-
-            bool light_on = (mode & 0x01);
-
-            bool fan_running = !(mode == 0x10 || mode == 0x11);
-
-            int fan_speed = fan_running ? (fan_raw + 1) : 0;
-
-            int brightness = (brightness_b * 100) / 255;
-
-            float t = color_b / 255.0;
-            t = pow(t, 1.6);   // 更自然色温曲线
-            int color_temp = 2700 + (6500 - 2700) * t;
-
-            id(dev3_power)->publish_state(light_on);
-            id(dev3_fan_running)->publish_state(fan_running);
-            id(dev3_fan_speed)->publish_state(fan_speed);
-            id(dev3_brightness)->publish_state(brightness);
-            id(dev3_color_temp)->publish_state(color_temp);
-            id(dev3_timer)->publish_state(timer_raw);
-
-            ESP_LOGI("midea_ble",
-              "mode=%02X light=%d fan=%d speed=%d bright=%d color=%d timer=%d",
-              mode,
-              light_on,
-              fan_running,
-              fan_speed,
-              brightness,
-              color_temp,
-              timer_raw
-            );
+            }
+            
+            // 打印调试信息
+            ESP_LOGD("BLE_Debug", "Payload[0-21]: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+              payload[0], payload[1], payload[2], payload[3], payload[4], payload[5],
+              payload[6], payload[7], payload[8], payload[9], payload[10], payload[11],
+              payload[12], payload[13], payload[14], payload[15], payload[16], payload[17],
+              payload[18], payload[19], payload[20], payload[21]);
+            
+            // 协议头检查
+            if (payload[0] != 0x21) continue;
+            
+            // ✅ 校准后的索引 (payload 已剥离 2 字节 Company ID)
+            bool power_on = (payload[9] == 0x01);                    // 开关: 索引 9
+            bool fan_running = ((payload[10] & 0x01) != 0);          // 风扇运行: 索引 10 的最低位
+            uint8_t fan_gear_idx = payload[19];                       // 档位索引: 索引 19
+            uint16_t brt_raw = ((uint16_t)payload[14] << 8) | payload[15];  // 亮度: 索引 14-15
+            int brightness = (brt_raw == 0xFFFF) ? 100 : (int)(brt_raw / 655.35f);
+            
+            // ✅ 发布状态 (注意：用 . 不是 ->)
+            id(dev3_power).publish_state(power_on);
+            id(dev3_fan_running).publish_state(fan_running);
+            id(dev3_fan_speed).publish_state(fan_running ? (fan_gear_idx + 1) : 0);
+            id(dev3_brightness).publish_state(brightness);
+            
+            ESP_LOGI("midea_ble", "✅ Power=%d Fan=%d(Idx%d) BRT=%d%% (Raw: %04X)",
+                     power_on, fan_running, fan_gear_idx, brightness, brt_raw);
           }
 
+# ========== Dev3 状态实体 (只读) ==========
 binary_sensor:
   - platform: template
     name: "Dev3 Light Power"
     id: dev3_power
+    device_class: light
+    icon: mdi:ceiling-light
 
   - platform: template
     name: "Dev3 Fan Running"
     id: dev3_fan_running
-
+    device_class: running
+    icon: mdi:fan
 
 sensor:
   - platform: template
     name: "Dev3 Fan Speed"
     id: dev3_fan_speed
     unit_of_measurement: "档"
+    accuracy_decimals: 0
+    icon: mdi:numeric
 
   - platform: template
     name: "Dev3 Brightness"
     id: dev3_brightness
     unit_of_measurement: "%"
-
-  - platform: template
-    name: "Dev3 Color Temp"
-    id: dev3_color_temp
-    unit_of_measurement: "K"
-
-  - platform: template
-    name: "Dev3 Timer"
-    id: dev3_timer
-    unit_of_measurement: "min"
+    accuracy_decimals: 0
+    icon: mdi:brightness-percent
