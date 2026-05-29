@@ -2,22 +2,13 @@ esphome:
   name: midea-dual-control
   friendly_name: Midea Dual Control
 
-  on_boot:
-    priority: -100
-    then:
-      - lambda: |-
-          id(dev3_power)->publish_state(false);
-          id(dev3_fan_running)->publish_state(false);
-          id(dev3_fan_speed)->publish_state(0);
-          id(dev3_brightness)->publish_state(0);
-          id(dev3_color_temp)->publish_state(0);
-          id(dev3_timer)->publish_state(0);
-
 esp32:
   board: esp32-s3-devkitc-1
   framework:
     type: esp-idf
     version: recommended
+    sdkconfig_options:
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
 
 logger:
   level: INFO
@@ -44,6 +35,9 @@ wifi:
 esp32_ble:
   io_capability: none
 
+esp32_ble_server:
+  id: ble_server
+  manufacturer_data: []
 
 # ========== 全局变量 (非阻塞架构核心) ==========
 globals:
@@ -355,8 +349,8 @@ esp32_ble_tracker:
   scan_parameters:
     active: false
     continuous: true
-    interval: 500ms
-    window: 120ms
+    interval: 320ms
+    window: 300ms
 
   on_ble_advertise:
     then:
