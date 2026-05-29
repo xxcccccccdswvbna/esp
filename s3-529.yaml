@@ -350,65 +350,84 @@ esp32_ble_tracker:
     active: false
     continuous: true
 
-  on_ble_manufacturer_data_advertise:
-    - manufacturer_id: "134D"
-      then:
+  on_ble_advertise:
+    - then:
         - lambda: |-
-            auto mac = x.address_str();
+            std::string mac = x.address_str();
 
             // 只监听你的设备
-            if (mac != "00:00:70:27:80:48") {
-              return;
-            }
+            if (mac != "00:00:70:27:80:48") return;
 
-            auto data = x.manufacturer_data;
+            auto data = x.get_manufacturer_datas();
 
-            if (data.size() < 20) {
-              ESP_LOGW(
+            if (data.size() == 0) return;
+
+            for (auto md : data) {
+
+              if (md.uuid.to_string() != "0x134D") {
+                continue;
+              }
+
+              auto payload = md.data;
+
+              if (payload.size() < 20) {
+                ESP_LOGW(
+                  "midea_ble",
+                  "short packet len=%d",
+                  payload.size()
+                );
+                continue;
+              }
+
+              ESP_LOGI(
                 "midea_ble",
-                "short packet from %s len=%d",
+                "recv mac=%s len=%d",
                 mac.c_str(),
-                data.size()
+                payload.size()
               );
-              return;
+
+              bool power_on = payload[9] == 0x01;
+
+              bool fan_running =
+                  (payload[18] & 0x01) != 0;
+
+              uint8_t fan_gear_idx =
+                  payload[19];
+
+              uint16_t brt_raw =
+                  ((uint16_t)payload[14] << 8)
+                  | payload[15];
+
+              int brightness =
+                  brt_raw == 0xFFFF
+                    ? 100
+                    : (int)(brt_raw / 655.35f);
+
+              id(dev3_power).publish_state(power_on);
+
+              id(dev3_fan_running).publish_state(
+                fan_running
+              );
+
+              id(dev3_fan_speed).publish_state(
+                fan_running
+                  ? fan_gear_idx + 1
+                  : 0
+              );
+
+              id(dev3_brightness).publish_state(
+                brightness
+              );
+
+              ESP_LOGI(
+                "midea_ble",
+                "Power=%d Fan=%d Speed=%d Brightness=%d",
+                power_on,
+                fan_running,
+                fan_gear_idx + 1,
+                brightness
+              );
             }
-
-            // 调试输出
-            ESP_LOGI(
-              "midea_ble",
-              "recv mac=%s len=%d",
-              mac.c_str(),
-              data.size()
-            );
-
-            bool power_on = data[9] == 0x01;
-            bool fan_running = data[18] & 0x01;
-            uint8_t fan_gear_idx = data[19];
-
-            uint16_t brt_raw =
-                ((uint16_t)data[14] << 8) |
-                data[15];
-
-            int brightness =
-                brt_raw == 0xFFFF
-                ? 100
-                : (int)(brt_raw / 655.35f);
-
-            id(dev3_power).publish_state(power_on);
-            id(dev3_fan_running).publish_state(fan_running);
-            id(dev3_fan_speed).publish_state(
-              fan_running ? fan_gear_idx + 1 : 0
-            );
-            id(dev3_brightness).publish_state(brightness);
-
-            ESP_LOGI(
-              "midea_ble",
-              "Power=%d Fan=%d Speed=%d Brightness=%d%%",
-              power_on,
-              fan_running,
-              fan_gear_idx + 1,
-              brightness
-            );
 
 # ========== Dev3 状态实体 (只读) ==========
 binary_sensor:
