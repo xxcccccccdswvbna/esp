@@ -377,7 +377,7 @@ esp32_ble_tracker:
     window: 100ms
     active: true
     continuous: true
-  on_ble_advertise:  # ✅ 改用全局广播监听，可同时访问设备和厂商数据
+  on_ble_advertise:
     then:
       - lambda: |-
           // 1. 获取设备信息
@@ -385,8 +385,14 @@ esp32_ble_tracker:
           int rssi = x.get_rssi();
           ESP_LOGD("BLE_DEBUG", ">>> Adv from: [%s] RSSI=%d", raw_mac.c_str(), rssi);
           
-          // 2. 获取并过滤厂商数据
+          // 🔍 调试：打印所有厂商数据的 UUID（确认是否收到 0x134D）
           auto mfr_datas = x.get_manufacturer_datas();
+          for (const auto &md : mfr_datas) {
+            ESP_LOGI("UUID_DEBUG", "Device %s UUID: %s | Len: %d", 
+                     raw_mac.c_str(), md.uuid.to_string().c_str(), md.data.size());
+          }
+          
+          // 2. 如果无厂商数据，直接返回（跳过后续解析）
           if (mfr_datas.empty()) return;
           
           for (const auto &md : mfr_datas) {
@@ -401,9 +407,9 @@ esp32_ble_tracker:
             if (mac_upper != target_mac) continue;
             
             // 4. 解析字段 (基于最新抓包校准)
-            auto &p = md.data;  // ✅ 这才是剥离 Company ID 后的有效负载
+            auto &p = md.data;
             if (p.size() < 20) continue;
-            if (p[0] != 0x21) continue;  // 协议头校验
+            if (p[0] != 0x21) continue;
             
             uint8_t mode = p[10];
             uint8_t brt_val = p[11];
