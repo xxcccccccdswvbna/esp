@@ -12,8 +12,8 @@ logger:
   level: INFO
   logs:
     esp32_ble_server: WARN
-  esp32_cdc:
-    enabled: true  # 启用 USB 日志
+    esp32_ble_tracker: WARN
+  # ❌ 删除 hardware_uart: USB_CDC，使用默认 UART 输出
 
 api:
   encryption:
