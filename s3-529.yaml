@@ -347,90 +347,68 @@ button:
 # ========== 新增：新版协议设备 (Dev3) 状态监听 ==========
 esp32_ble_tracker:
   scan_parameters:
-    interval: 300ms
-    window: 280ms
+    interval: 320ms
+    window: 300ms
     active: false
     continuous: true
 
   on_ble_advertise:
-    - then:
-        - lambda: |-
-            if (x.address_str() != "00:00:70:27:80:48") return;
+    then:
+      - lambda: |-
+          for (auto md : x.get_manufacturer_datas()) {
 
-            auto datas = x.get_manufacturer_datas();
+            if (md.uuid.to_string() != "0x134D")
+              continue;
 
-            for (auto md : datas) {
+            auto p = md.data;
 
-              if (md.uuid.to_string() != "0x134D") continue;
+            if (p.size() < 23)
+              continue;
 
-              auto payload = md.data;
+            uint8_t mode =
+              p[p.size() - 3];
 
-              if (payload.size() < 22) return;
+            uint8_t speed_raw =
+              p[p.size() - 2];
 
-              bool power_on =
-                  payload[11] == 0x01;
+            bool light_on =
+              mode & 0x02;
 
-              bool fan_running =
-                  payload[20] == 0x13;
+            bool fan_running =
+              mode & 0x01;
 
-              int fan_speed =
-                  fan_running
-                    ? payload[21] + 1
-                    : 0;
+            int fan_speed =
+              fan_running
+                ? speed_raw + 1
+                : 0;
 
-              uint16_t br_raw =
-                  ((uint16_t)payload[14] << 8)
-                  | payload[15];
+            id(dev3_power)
+              .publish_state(light_on);
 
-              int brightness = 0;
+            id(dev3_fan_running)
+              .publish_state(fan_running);
 
-              if (br_raw == 0xFFFF) {
-                brightness = 100;
-              } else {
-                brightness =
-                  round(
-                    br_raw / 65535.0 * 100
-                  );
-              }
+            id(dev3_fan_speed)
+              .publish_state(fan_speed);
 
-              id(dev3_power).publish_state(
-                power_on
-              );
+            ESP_LOGI(
+              "midea_ble",
+              "mode=%02X light=%d fan=%d speed=%d",
+              mode,
+              light_on,
+              fan_running,
+              fan_speed
+            );
+          }
 
-              id(dev3_fan_running).publish_state(
-                fan_running
-              );
-
-              id(dev3_fan_speed).publish_state(
-                fan_speed
-              );
-
-              id(dev3_brightness).publish_state(
-                brightness
-              );
-
-              ESP_LOGI(
-                "midea_ble",
-                "power=%d fan=%d speed=%d brightness=%d",
-                power_on,
-                fan_running,
-                fan_speed,
-                brightness
-              );
-            }
-
-# ========== Dev3 状态实体 (只读) ==========
 binary_sensor:
   - platform: template
     name: "Dev3 Light Power"
     id: dev3_power
-    device_class: light
-    icon: mdi:ceiling-light
+
   - platform: template
     name: "Dev3 Fan Running"
     id: dev3_fan_running
-    device_class: running
-    icon: mdi:fan
 
 sensor:
   - platform: template
@@ -438,10 +416,3 @@ sensor:
     id: dev3_fan_speed
     unit_of_measurement: "档"
     accuracy_decimals: 0
-    icon: mdi:numeric
-  - platform: template
-    name: "Dev3 Brightness"
-    id: dev3_brightness
-    unit_of_measurement: "%"
-    accuracy_decimals: 0
-    icon: mdi:brightness-percent 
