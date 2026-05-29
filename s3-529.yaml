@@ -12,9 +12,9 @@ esp32:
   framework:
     type: esp-idf
     version: recommended
-  sdkconfig_options:
-    CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
-    CONFIG_FREERTOS_HZ: 1000
+    sdkconfig_options:  # ← 必须缩进到 framework 下面
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+      CONFIG_FREERTOS_HZ: "1000"
 
 logger:
   level: INFO
