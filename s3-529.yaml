@@ -40,7 +40,10 @@ wifi:
   ssid: "CC"
   password: "chen1122"
   power_save_mode: none
-
+  
+bluetooth_proxy:
+  active: true
+  
 esp32_ble:
   io_capability: none
 
