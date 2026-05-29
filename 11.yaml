@@ -1,0 +1,61 @@
+esphome:
+  name: ble-scan-only
+  friendly_name: BLE Scan Only
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+    version: recommended
+
+logger:
+  level: VERY_VERBOSE  # 临时最高级别
+  logs:
+    esp32_ble: DEBUG
+    esp32_ble_tracker: DEBUG
+    esp32_ble_tracker.scanner: DEBUG
+    SCAN_TEST: INFO
+
+wifi:
+  ssid: "CC"
+  password: "chen1122"
+  power_save_mode: none
+
+api:
+  encryption:
+    key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
+
+# ✅ 仅声明基础控制器，不启 Server
+esp32_ble:
+  io_capability: none
+
+# ✅ 纯扫描器（无任何过滤，打印所有包）
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1100ms
+    window: 1100ms
+    active: false
+    continuous: true
+  on_ble_advertise:
+    then:
+      - lambda: |-
+          // ✅ 无条件打印所有设备
+          ESP_LOGI("SCAN_TEST", ">>> Found: %s RSSI=%d", 
+                   x.address_str().c_str(), x.get_rssi());
+          
+          // ✅ 打印所有厂商数据
+          auto mfrs = x.get_manufacturer_datas();
+          if (!mfrs.empty()) {
+            for (size_t i = 0; i < mfrs.size(); i++) {
+              const auto &md = mfrs[i];
+              ESP_LOGI("SCAN_MFR", "    [%d] UUID: %s | Len: %d", 
+                       i, md.uuid.to_string().c_str(), md.data.size());
+              // 打印前 16 字节原始数据
+              if (md.data.size() >= 16) {
+                ESP_LOGD("SCAN_MFR", "    Data: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X",
+                         md.data[0], md.data[1], md.data[2], md.data[3], md.data[4], md.data[5],
+                         md.data[6], md.data[7], md.data[8], md.data[9], md.data[10], md.data[11],
+                         md.data[12], md.data[13], md.data[14], md.data[15]);
+              }
+            }
+          }
