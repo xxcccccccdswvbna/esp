@@ -8,6 +8,13 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        yaml:
+          - S3-529.yaml
+          - midea-send-only.yaml
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,20 +22,15 @@ jobs:
       - name: Build ESPHome
         uses: esphome/build-action@v6
         with:
-          yaml-file: midea-send-only.yaml
+          yaml-file: ${{ matrix.yaml }}
 
-      - name: 收集所有 .bin 固件
+      - name: 收集固件
         run: |
           mkdir -p output
-          # 递归查找构建目录下的所有 .bin 文件，扁平化复制到 output 目录
-          find .esphome/build/ -type f -name "*.bin" -exec cp -f {} output/ \;
-          echo "✅ 已收集完整固件列表:"
-          ls -1 output/
+          find . -type f -name "*.bin" -exec cp -f {} output/ \;
 
-      - name: 上传完整固件包
+      - name: 上传固件
         uses: actions/upload-artifact@v4
         with:
-          name: midea-fan-light-all-bins
+          name: esphome-${{ matrix.yaml }}
           path: output/
-          retention-days: 30
-          if-no-files-found: error
