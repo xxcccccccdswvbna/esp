@@ -375,7 +375,7 @@ esp32_ble_tracker:
     window: 1100ms
     active: false
     continuous: true
-    duration: 3.3s    # ✅ 改为秒单位，3.3 秒 = 3300 毫秒，覆盖 3 个广播频道
+    # ✅ duration 已移除：当 continuous: true 时，扫描器会自动持续运行，无需指定时长
   on_ble_advertise:
     then:
       - lambda: |-
