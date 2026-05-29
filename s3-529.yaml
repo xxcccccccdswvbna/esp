@@ -357,72 +357,46 @@ esp32_ble_tracker:
       - lambda: |-
           for (auto md : x.get_manufacturer_datas()) {
 
-            if (md.uuid.to_str() != "0x134D")
+            // ✅ ESPHome 1.11+ 正确 UUID 比较方式
+            if (md.uuid != esp32_ble_tracker::ESPBTUUID::from_uint16(0x134D))
               continue;
 
-            auto p = md.data;
+            auto &p = md.data;
 
-            if (p.size() < 20)
+            // 防止越界
+            if (p.size() < 16)
               continue;
 
             uint8_t mode = p[5];
 
             uint8_t brightness_b = p[11];
-
             uint8_t color_b = p[12];
 
-            uint16_t timer_raw =
-              (p[13] << 8) | p[14];
+            uint16_t timer_raw = (p[13] << 8) | p[14];
 
-            uint8_t fan_raw =
-              p[p.size() - 2];
+            // ⚠️ 防止长度变化导致越界
+            uint8_t fan_raw = p[p.size() > 16 ? p.size() - 2 : 15];
 
-            bool light_on =
-              mode & 0x01;
+            bool light_on = (mode & 0x01);
 
-            bool fan_running =
-              !(mode == 0x10 || mode == 0x11);
+            bool fan_running = !(mode == 0x10 || mode == 0x11);
 
-            int fan_speed =
-              fan_running
-                ? fan_raw + 1
-                : 0;
+            int fan_speed = fan_running ? (fan_raw + 1) : 0;
 
-            int brightness =
-              round(
-                brightness_b
-                * 100.0
-                / 255.0
-              );
+            int brightness = (brightness_b * 100) / 255;
 
-            int color_temp =
-              round(
-                2700
-                + ((6500 - 2700)
-                * color_b
-                / 255.0)
-              );
+            float t = color_b / 255.0;
+            t = pow(t, 1.6);   // 更自然色温曲线
+            int color_temp = 2700 + (6500 - 2700) * t;
 
-            id(dev3_power)
-              ->publish_state(light_on);
+            id(dev3_power)->publish_state(light_on);
+            id(dev3_fan_running)->publish_state(fan_running);
+            id(dev3_fan_speed)->publish_state(fan_speed);
+            id(dev3_brightness)->publish_state(brightness);
+            id(dev3_color_temp)->publish_state(color_temp);
+            id(dev3_timer)->publish_state(timer_raw);
 
-            id(dev3_fan_running)
-              ->publish_state(fan_running);
-
-            id(dev3_fan_speed)
-              ->publish_state(fan_speed);
-
-            id(dev3_brightness)
-              ->publish_state(brightness);
-
-            id(dev3_color_temp)
-              ->publish_state(color_temp);
-
-            id(dev3_timer)
-              ->publish_state(timer_raw);
-
-            ESP_LOGI(
-              "midea_ble",
+            ESP_LOGI("midea_ble",
               "mode=%02X light=%d fan=%d speed=%d bright=%d color=%d timer=%d",
               mode,
               light_on,
@@ -442,6 +416,7 @@ binary_sensor:
   - platform: template
     name: "Dev3 Fan Running"
     id: dev3_fan_running
+
 
 sensor:
   - platform: template
