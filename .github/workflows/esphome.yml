@@ -45,9 +45,20 @@ jobs:
         with:
           yaml-file: ${{ matrix.yaml }}
 
+      - name: 收集所有 BIN
+        run: |
+          mkdir -p output
+
+          find .esphome/build -type f -name "*.bin" \
+            -exec cp -f {} output/ \;
+
+          echo "==== BIN 文件 ===="
+          ls -lah output/
+
       - name: 上传固件
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.yaml }}-firmware
-          path: .esphome/build/
+          path: output/*
           retention-days: 30
+          if-no-files-found: error
