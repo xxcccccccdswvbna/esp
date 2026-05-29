@@ -393,17 +393,3 @@ sensor:
     unit_of_measurement: "%"
     accuracy_decimals: 0
     icon: mdi:brightness-percent 
-# ========== 网络看门狗 (最小兼容版) ==========
-interval:
-  - interval: 60s
-    then:
-      - lambda: |-
-          static uint32_t last_ok = 0;
-          // ESPHome 2026.x 标准网络检测
-          if (network::is_connected()) {
-            last_ok = millis();  // 网络正常，刷新时间
-          } else if (millis() - last_ok > 180000) {  // 连续 3 分钟断网
-            ESP_LOGW("Watchdog", "Network lost >3min, rebooting...");
-            delay(100);  // 留给日志输出
-            App.reboot();  // 安全重启
-          }
