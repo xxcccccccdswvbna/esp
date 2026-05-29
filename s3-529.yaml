@@ -373,28 +373,37 @@ button:
 # ========== 稳定版 Dev3 状态监听 (融合去重 + 防冲突) ==========
 esp32_ble_tracker:
   scan_parameters:
-    interval: 100ms   # 🔑 关键：匹配设备 39ms 广播间隔，确保不漏包
-    window: 100ms     # 100% 占空比扫描
-    active: true      # 🔑 关键：主动请求响应包（美的数据常在响应包中）
+    interval: 100ms
+    window: 100ms
+    active: true
     continuous: true
-  on_ble_manufacturer_data_advertise:  # 🔑 关键：改用官方厂商数据监听器
-    - manufacturer_id: "134D"
-      then:
-        - lambda: |-
-            // 1. 打印原始 MAC 格式，确认匹配
-            std::string raw_mac = x.address_str();
-            ESP_LOGD("BLE_DEBUG", ">>> Mfr Adv from: [%s]", raw_mac.c_str());
+  on_ble_advertise:  # ✅ 改用全局广播监听，可同时访问设备和厂商数据
+    then:
+      - lambda: |-
+          // 1. 获取设备信息
+          std::string raw_mac = x.address_str();
+          int rssi = x.get_rssi();
+          ESP_LOGD("BLE_DEBUG", ">>> Adv from: [%s] RSSI=%d", raw_mac.c_str(), rssi);
+          
+          // 2. 获取并过滤厂商数据
+          auto mfr_datas = x.get_manufacturer_datas();
+          if (mfr_datas.empty()) return;
+          
+          for (const auto &md : mfr_datas) {
+            // 检查 Company ID 0x134D
+            if (md.uuid != esp32_ble_tracker::ESPBTUUID::from_uint16(0x134D)) continue;
             
-            // 2. 统一转大写比对，避免大小写/格式差异
+            // 3. MAC 过滤（转大写比对）
             std::string target_mac = "00:00:70:27:80:48";
-            std::transform(raw_mac.begin(), raw_mac.end(), raw_mac.begin(), ::toupper);
+            std::string mac_upper = raw_mac;
+            std::transform(mac_upper.begin(), mac_upper.end(), mac_upper.begin(), ::toupper);
             std::transform(target_mac.begin(), target_mac.end(), target_mac.begin(), ::toupper);
-            if (raw_mac != target_mac) return;
+            if (mac_upper != target_mac) continue;
             
-            // 3. 解析字段 (基于最新抓包校准)
-            auto &p = x;  // x 已是剥离 Company ID 后的有效负载
-            if (p.size() < 20) return;
-            if (p[0] != 0x21) return;  // 协议头校验
+            // 4. 解析字段 (基于最新抓包校准)
+            auto &p = md.data;  // ✅ 这才是剥离 Company ID 后的有效负载
+            if (p.size() < 20) continue;
+            if (p[0] != 0x21) continue;  // 协议头校验
             
             uint8_t mode = p[10];
             uint8_t brt_val = p[11];
@@ -405,7 +414,7 @@ esp32_ble_tracker:
             int fan_speed = fan_on ? (fan_idx + 1) : 0;
             int brightness = (brt_val * 100) / 255;
             
-            // 4. 防冲突 & 发布状态
+            // 5. 防冲突 & 发布状态
             if (id(is_sending)) return;
             
             id(dev3_power).publish_state(light_on);
@@ -415,6 +424,7 @@ esp32_ble_tracker:
             
             ESP_LOGI("midea_ble", "✅ Dev3: Light=%d Fan=%d(Spd%d) BRT=%d%%",
                      light_on, fan_on, fan_speed, brightness);
+          }
 # ========== Dev3 状态实体 ==========
 binary_sensor:
   - platform: template
