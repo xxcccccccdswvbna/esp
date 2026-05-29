@@ -332,11 +332,11 @@ button:
 # ========== 稳定版 Dev3 状态监听 ==========
 esp32_ble_tracker:
   scan_parameters:
-    interval: 1100ms  # 降低频率，减少与 WiFi 心跳冲突
-    window: 1100ms    # ✅ 关键：100% 占空比连续扫描
+    interval: 1100ms
+    window: 1100ms      # 100% 占空比连续扫描
     active: false
     continuous: true
-    duration: 0s      # ✅ 永不超时
+    duration: 3300ms    # ✅ 必须 ≥ 3×interval (1100×3=3300)，覆盖 3 个广播频道
   on_ble_advertise:
     then:
       - lambda: |-
