@@ -1,7 +1,7 @@
 esphome:
   name: midea-dual-control
   friendly_name: Midea Dual Control
-  # ✅ 启动延迟：让 WiFi/BLE 协议栈稳定后再初始化广播，避免抢占射频
+  # ✅ 启动延迟：让射频初始化完成后再广播，避免抢占
   on_boot:
     - priority: 600
       then:
@@ -12,7 +12,8 @@ esp32:
   framework:
     type: esp-idf
     version: recommended
-    sdkconfig_options:  # ← 必须缩进到 framework 下面
+    # ✅ 必须缩进到 framework 下，否则编译报错
+    sdkconfig_options:
       CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
       CONFIG_FREERTOS_HZ: "1000"
 
@@ -21,8 +22,8 @@ logger:
   logs:
     esp32_ble: WARN
     esp32_ble_tracker: WARN
-    BLE_RAW: INFO   # ← 必须设为 INFO，否则 Found 日志会被隐藏
-    midea_ble: INFO # ← 必须设为 INFO，否则解析日志会被隐藏
+    BLE_RAW: INFO      # ← 确保扫描日志可见
+    midea_ble: INFO    # ← 确保解析日志可见
 
 api:
   encryption:
@@ -45,7 +46,7 @@ esp32_ble_server:
   id: ble_server
   manufacturer_data: []
 
-# ========== 全局变量 ==========
+# ========== 全局变量 (防冲突 + 去重核心) ==========
 globals:
   - id: last_cmd_time
     type: uint32_t
@@ -56,9 +57,30 @@ globals:
   - id: end_pkt
     type: std::vector<uint8_t>
     initial_value: 'std::vector<uint8_t>{}'
+  - id: is_sending
+    type: bool
+    initial_value: 'false'
+  - id: dev3_last_payload
+    type: std::array<uint8_t, 24>
+    initial_value: '{0}'
+  - id: dev3_first_run
+    type: bool
+    initial_value: 'true'
 
-# ========== 滑块：Dev1/Dev2 亮度 & 色温 ==========
+# ========== 清空广播脚本 (防射频干扰) ==========
+script:
+  - id: clear_broadcast
+    then:
+      - delay: 500ms
+      - lambda: |-
+          std::vector<uint8_t> empty(26, 0x00);
+          id(ble_server).set_manufacturer_data(empty);
+      - delay: 500ms
+      - globals.set: {id: is_sending, value: 'false'}
+
+# ========== 滑块控制：亮度 & 色温 ==========
 number:
+  # 🟦 Dev1 亮度
   - platform: template
     name: "Dev1 Light Brightness"
     id: dev1_brt
@@ -93,6 +115,7 @@ number:
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
 
+  # 🟦 Dev1 色温
   - platform: template
     name: "Dev1 Light Color Temp"
     id: dev1_ct
@@ -125,6 +148,7 @@ number:
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
 
+  # 🟧 Dev2 亮度
   - platform: template
     name: "Dev2 Light Brightness"
     id: dev2_brt
@@ -159,6 +183,7 @@ number:
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
 
+  # 🟧 Dev2 色温
   - platform: template
     name: "Dev2 Light Color Temp"
     id: dev2_ct
@@ -189,8 +214,9 @@ number:
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
 
-# ========== 下拉菜单：Dev1/Dev2 风扇档位 ==========
+# ========== 下拉菜单：风扇档位 ==========
 select:
+  # 🟦 Dev1 风扇
   - platform: template
     name: "Dev1 Fan Speed Select"
     id: dev1_fan_select
@@ -217,6 +243,7 @@ select:
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
 
+  # 🟧 Dev2 风扇
   - platform: template
     name: "Dev2 Fan Speed Select"
     id: dev2_fan_select
@@ -249,6 +276,7 @@ button:
     name: "Dev1 Light Toggle"
     icon: mdi:lightbulb
     on_press:
+      - globals.set: {id: is_sending, value: 'true'}
       - lambda: |-
           if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
           id(cmd_pkt) = {0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x86,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x40};
@@ -258,11 +286,13 @@ button:
       - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt));'
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
+      - script.execute: clear_broadcast
 
   - platform: template
     name: "Dev1 Fan Toggle"
     icon: mdi:fan
     on_press:
+      - globals.set: {id: is_sending, value: 'true'}
       - lambda: |-
           if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
           id(cmd_pkt) = {0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x89,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x43};
@@ -272,11 +302,13 @@ button:
       - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt));'
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
+      - script.execute: clear_broadcast
 
   - platform: template
     name: "Dev1 Fan Reverse"
     icon: mdi:sync-reverse
     on_press:
+      - globals.set: {id: is_sending, value: 'true'}
       - lambda: |-
           if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
           id(cmd_pkt) = {0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x9C,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x56};
@@ -286,11 +318,13 @@ button:
       - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt));'
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
+      - script.execute: clear_broadcast
 
   - platform: template
     name: "Dev2 Light Toggle"
     icon: mdi:lightbulb
     on_press:
+      - globals.set: {id: is_sending, value: 'true'}
       - lambda: |-
           if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
           id(cmd_pkt) = {0x11,0x4D,0x19,0x13,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xF1,0xF0,0xFA,0x3F,0xCF,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x15};
@@ -300,11 +334,13 @@ button:
       - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt));'
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
+      - script.execute: clear_broadcast
 
   - platform: template
     name: "Dev2 Fan Toggle"
     icon: mdi:fan
     on_press:
+      - globals.set: {id: is_sending, value: 'true'}
       - lambda: |-
           if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
           id(cmd_pkt) = {0x11,0x4D,0x19,0x11,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0x1C,0x60,0xF9,0xF0,0xFC,0x3F,0xCF,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x57};
@@ -314,11 +350,13 @@ button:
       - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt));'
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
+      - script.execute: clear_broadcast
 
   - platform: template
     name: "Dev2 Fan Reverse"
     icon: mdi:sync-reverse
     on_press:
+      - globals.set: {id: is_sending, value: 'true'}
       - lambda: |-
           if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
           id(cmd_pkt) = {0x11,0x4D,0x19,0x15,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xFD,0x3F,0x49,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x1D,0x60,0x78};
@@ -328,19 +366,20 @@ button:
       - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt));'
       - delay: 300ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
+      - script.execute: clear_broadcast
 
-# ========== 稳定版 Dev3 状态监听 ==========
+# ========== 稳定版 Dev3 状态监听 (融合去重 + 防冲突) ==========
 esp32_ble_tracker:
   scan_parameters:
     interval: 1100ms
-    window: 1100ms      # 100% 占空比连续扫描
+    window: 1100ms
     active: false
     continuous: true
-    duration: 3300ms    # ✅ 必须 ≥ 3×interval (1100×3=3300)，覆盖 3 个广播频道
+    duration: 3300ms  # ✅ 必须 ≥ 3×interval，覆盖 3 个广播频道
   on_ble_advertise:
     then:
       - lambda: |-
-          // 1. 打印所有设备（强制可见）
+          // 1. 打印所有设备 (调试用)
           ESP_LOGI("BLE_RAW", ">>> Found: %s RSSI=%d", 
                    x.address_str().c_str(), x.get_rssi());
           
@@ -358,24 +397,50 @@ esp32_ble_tracker:
             if (p.size() < 20) continue;
             if (p[0] != 0x21) continue;  // 协议头校验
             
-            // 4. 解析字段 (已校准)
+            // 4. ✅ 数据去重 (参考配置核心逻辑)
+            bool same_as_last = true;
+            if (id(dev3_first_run)) {
+              same_as_last = false;
+              id(dev3_first_run) = false;
+            } else {
+              for (int i = 0; i < 20 && i < p.size(); i++) {
+                if (p[i] != id(dev3_last_payload)[i]) {
+                  same_as_last = false;
+                  break;
+                }
+              }
+            }
+            if (same_as_last) return;  // 数据未变化，跳过
+            
+            // 保存当前数据
+            for (int i = 0; i < 20 && i < p.size(); i++) {
+              id(dev3_last_payload)[i] = p[i];
+            }
+            
+            // 5. ✅ 发送时跳过状态更新 (防冲突)
+            if (id(is_sending)) {
+              ESP_LOGD("midea_ble", "Sending, skip state update");
+              return;
+            }
+            
+            // 6. 解析字段 (已校准)
             bool power_on = (p[9] == 0x01);
             bool fan_running = ((p[10] & 0x01) != 0);
             uint8_t fan_idx = p[19];
             uint16_t brt_raw = ((uint16_t)p[14] << 8) | p[15];
             int brightness = (brt_raw == 0xFFFF) ? 100 : (int)(brt_raw / 655.35f);
             
-            // 5. 发布状态
+            // 7. 发布状态
             id(dev3_power).publish_state(power_on);
             id(dev3_fan_running).publish_state(fan_running);
             id(dev3_fan_speed).publish_state(fan_running ? (fan_idx + 1) : 0);
             id(dev3_brightness).publish_state(brightness);
             
-            ESP_LOGI("midea_ble", "✅ Dev3 Update: Power=%d Fan=%d(Idx%d) BRT=%d%%", 
+            ESP_LOGI("midea_ble", "✅ Dev3: Power=%d Fan=%d(Idx%d) BRT=%d%%", 
                      power_on, fan_running, fan_idx, brightness);
           }
 
-# ========== 状态实体 ==========
+# ========== Dev3 状态实体 ==========
 binary_sensor:
   - platform: template
     name: "Dev3 Light Power"
