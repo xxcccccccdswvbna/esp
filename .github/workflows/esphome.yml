@@ -5,32 +5,50 @@ on:
   push:
 
 jobs:
-  build:
+  discover:
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        yaml:
-          - S3-529.yaml
-          - midea-send-only.yaml
+    outputs:
+      files: ${{ steps.find.outputs.files }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build ESPHome
+      - name: 查找所有 YAML
+        id: find
+        run: |
+          FILES=$(find . -maxdepth 1 -name "*.yaml" -printf '%f\n' | jq -R -s -c 'split("\n")[:-1]')
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+          echo "找到以下配置文件:"
+          echo "$FILES"
+
+  build:
+    needs: discover
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        yaml: ${{ fromJson(needs.discover.outputs.files) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.yaml }}
         uses: esphome/build-action@v6
         with:
           yaml-file: ${{ matrix.yaml }}
 
       - name: 收集固件
         run: |
-          mkdir -p output
-          find . -type f -name "*.bin" -exec cp -f {} output/ \;
+          mkdir -p output/${{ matrix.yaml }}
+          find . -type f \( -name "*.bin" -o -name "manifest.json" \) \
+            -exec cp -f {} output/${{ matrix.yaml }}/ \;
 
       - name: 上传固件
         uses: actions/upload-artifact@v4
         with:
-          name: esphome-${{ matrix.yaml }}
-          path: output/
+          name: ${{ matrix.yaml }}-firmware
+          path: output/${{ matrix.yaml }}/
+          retention-days: 30
