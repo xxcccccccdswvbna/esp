@@ -373,72 +373,48 @@ button:
 # ========== 稳定版 Dev3 状态监听 (融合去重 + 防冲突) ==========
 esp32_ble_tracker:
   scan_parameters:
-    interval: 1100ms
-    window: 1100ms
-    active: false
+    interval: 100ms   # 🔑 关键：匹配设备 39ms 广播间隔，确保不漏包
+    window: 100ms     # 100% 占空比扫描
+    active: true      # 🔑 关键：主动请求响应包（美的数据常在响应包中）
     continuous: true
-  on_ble_advertise:
-    then:
-      - lambda: |-
-          // ✅ 无条件打印，确认扫描器在工作
-          ESP_LOGI("SCAN_TEST", ">>> BLE Advertise callback triggered! MAC=%s", x.address_str().c_str());
-          
-          // 2. MAC 过滤
-          std::string mac = x.address_str();
-          if (mac != "00:00:70:27:80:48") return;
-          
-          // 3. 厂商数据过滤
-          auto mfrs = x.get_manufacturer_datas();
-          if (mfrs.empty()) return;
-          
-          for (const auto &md : mfrs) {
-            if (md.uuid != esp32_ble_tracker::ESPBTUUID::from_uint16(0x134D)) continue;
-            auto &p = md.data;
-            if (p.size() < 20) continue;
-            if (p[0] != 0x21) continue;  // 协议头校验
+  on_ble_manufacturer_data_advertise:  # 🔑 关键：改用官方厂商数据监听器
+    - manufacturer_id: "134D"
+      then:
+        - lambda: |-
+            // 1. 打印原始 MAC 格式，确认匹配
+            std::string raw_mac = x.address_str();
+            ESP_LOGD("BLE_DEBUG", ">>> Mfr Adv from: [%s]", raw_mac.c_str());
             
-            // 4. ✅ 数据去重 (参考配置核心逻辑)
-            bool same_as_last = true;
-            if (id(dev3_first_run)) {
-              same_as_last = false;
-              id(dev3_first_run) = false;
-            } else {
-              for (int i = 0; i < 20 && i < p.size(); i++) {
-                if (p[i] != id(dev3_last_payload)[i]) {
-                  same_as_last = false;
-                  break;
-                }
-              }
-            }
-            if (same_as_last) return;  // 数据未变化，跳过
+            // 2. 统一转大写比对，避免大小写/格式差异
+            std::string target_mac = "00:00:70:27:80:48";
+            std::transform(raw_mac.begin(), raw_mac.end(), raw_mac.begin(), ::toupper);
+            std::transform(target_mac.begin(), target_mac.end(), target_mac.begin(), ::toupper);
+            if (raw_mac != target_mac) return;
             
-            // 保存当前数据
-            for (int i = 0; i < 20 && i < p.size(); i++) {
-              id(dev3_last_payload)[i] = p[i];
-            }
+            // 3. 解析字段 (基于最新抓包校准)
+            auto &p = x;  // x 已是剥离 Company ID 后的有效负载
+            if (p.size() < 20) return;
+            if (p[0] != 0x21) return;  // 协议头校验
             
-            // 5. ✅ 发送时跳过状态更新 (防冲突)
-            if (id(is_sending)) {
-              ESP_LOGD("midea_ble", "Sending, skip state update");
-              return;
-            }
-            
-            // 6. 解析字段 (已校准)
-            bool power_on = (p[9] == 0x01);
-            bool fan_running = ((p[10] & 0x01) != 0);
+            uint8_t mode = p[10];
+            uint8_t brt_val = p[11];
             uint8_t fan_idx = p[19];
-            uint16_t brt_raw = ((uint16_t)p[14] << 8) | p[15];
-            int brightness = (brt_raw == 0xFFFF) ? 100 : (int)(brt_raw / 655.35f);
             
-            // 7. 发布状态
-            id(dev3_power).publish_state(power_on);
-            id(dev3_fan_running).publish_state(fan_running);
-            id(dev3_fan_speed).publish_state(fan_running ? (fan_idx + 1) : 0);
+            bool light_on = (mode & 0x01);
+            bool fan_on = (mode != 0x10 && mode != 0x11);
+            int fan_speed = fan_on ? (fan_idx + 1) : 0;
+            int brightness = (brt_val * 100) / 255;
+            
+            // 4. 防冲突 & 发布状态
+            if (id(is_sending)) return;
+            
+            id(dev3_power).publish_state(light_on);
+            id(dev3_fan_running).publish_state(fan_on);
+            id(dev3_fan_speed).publish_state(fan_speed);
             id(dev3_brightness).publish_state(brightness);
             
-            ESP_LOGI("midea_ble", "✅ Dev3: Power=%d Fan=%d(Idx%d) BRT=%d%%", 
-                     power_on, fan_running, fan_idx, brightness);
-          }
+            ESP_LOGI("midea_ble", "✅ Dev3: Light=%d Fan=%d(Spd%d) BRT=%d%%",
+                     light_on, fan_on, fan_speed, brightness);
 # ========== Dev3 状态实体 ==========
 binary_sensor:
   - platform: template
