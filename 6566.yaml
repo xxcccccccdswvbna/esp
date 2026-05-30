@@ -15,7 +15,7 @@ logger:
 
 api:
   encryption:
-    key: "chen1122"
+    key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
   reboot_timeout: 1h
 
 ota:
