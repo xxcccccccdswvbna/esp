@@ -87,13 +87,14 @@ script:
 
 # ========== ✅ 优化版 Dev3 状态监听 (本地扫描) ==========
 # ========== 替换你当前的 esp32_ble_tracker ==========
+# ========== ✅ 修正版 Dev3 状态监听 ==========
 esp32_ble_tracker:
   scan_parameters:
-    interval: 1000ms    # ✅ 关键：恢复 C3 的宽松间隔，避免与 WiFi 冲突
+    interval: 1000ms    # ✅ 宽松间隔，避免与 WiFi 冲突
     window: 500ms
-    active: false       # ✅ 关键：被动扫描，不干扰低功耗风扇灯
+    active: false       # ✅ 被动扫描，稳定优先
     continuous: true
-  on_ble_manufacturer_data_advertise:  # ✅ 使用厂商数据监听器（与 C3 一致）
+  on_ble_manufacturer_data_advertise:
     - manufacturer_id: "134D"
       then:
         - lambda: |-
@@ -117,7 +118,7 @@ esp32_ble_tracker:
             
             ESP_LOGI("Dev3_State", "Power=%d Fan=%d(Idx%d) BRT=%d%%", 
                      power_on, fan_running, fan_gear_idx, (brt_raw==0xFFFF?100:(int)(brt_raw/655.35)));
-          }
+            # ← 注意：这里不要加 }，lambda 通过缩进自动结束
 
 # ========== Dev3 状态实体 ==========
 binary_sensor:
