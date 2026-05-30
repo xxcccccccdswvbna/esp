@@ -27,6 +27,14 @@ ota:
   platform: esphome
   password: "chen1122"
 
+# 🔹 新增：Web 控制台 + Web OTA 升级（浏览器访问 http://192.168.6.72）
+web_server:
+  port: 80
+  version: 2
+  # auth:                # ⚠️ 如需密码保护可取消注释
+  #   username: admin
+  #   password: chen1122
+  
 wifi:
   ssid: "CC"
   password: "chen1122"
