@@ -15,7 +15,7 @@ logger:
 
 api:
   encryption:
-    key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
+    key: "chen1122"
   reboot_timeout: 1h
 
 ota:
@@ -27,10 +27,10 @@ wifi:
   password: "chen1122"
   power_save_mode: none
   manual_ip:
-    static_ip: 192.168.1.188  # ⚠️ 请务必改为您的局域网空闲 IP
-    gateway: 192.168.1.1
+    static_ip: 192.168.6.81  # ⚠️ 请务必改为您的局域网空闲 IP
+    gateway: 192.168.6.1
     subnet: 255.255.255.0
-    dns1: 192.168.1.1
+    dns1: 192.168.6.1
 
 esp32_ble:
   io_capability: none
