@@ -86,58 +86,37 @@ script:
 # （为节省篇幅省略，实际使用时请保留原控制代码）
 
 # ========== ✅ 优化版 Dev3 状态监听 (本地扫描) ==========
+# ========== 替换你当前的 esp32_ble_tracker ==========
 esp32_ble_tracker:
   scan_parameters:
-    interval: 320ms   # ✅ S3 建议宽松值，避免与 Wi-Fi 抢占
-    window: 300ms
-    active: false     # ✅ 被动扫描更稳定
+    interval: 1000ms    # ✅ 关键：恢复 C3 的宽松间隔，避免与 WiFi 冲突
+    window: 500ms
+    active: false       # ✅ 关键：被动扫描，不干扰低功耗风扇灯
     continuous: true
-  on_ble_advertise:  # ✅ 改用全局广播监听，可同时访问设备和厂商数据
-    then:
-      - lambda: |-
-          // 1. 获取设备信息
-          std::string raw_mac = x.address_str();
-          int rssi = x.get_rssi();
-          
-          // 2. 获取并过滤厂商数据
-          auto mfr_datas = x.get_manufacturer_datas();
-          if (mfr_datas.empty()) return;
-          
-          for (const auto &md : mfr_datas) {
-            // 检查 Company ID 0x134D
-            if (md.uuid != esp32_ble_tracker::ESPBTUUID::from_uint16(0x134D)) continue;
+  on_ble_manufacturer_data_advertise:  # ✅ 使用厂商数据监听器（与 C3 一致）
+    - manufacturer_id: "134D"
+      then:
+        - lambda: |-
+            if (x.size() < 20) return;
+            if (x[0] != 0x21) return;  // 协议头过滤
             
-            // 3. MAC 过滤（转大写比对）
-            std::string target_mac = "00:00:70:27:80:48";
-            std::string mac_upper = raw_mac;
-            std::transform(mac_upper.begin(), mac_upper.end(), mac_upper.begin(), ::toupper);
-            std::transform(target_mac.begin(), target_mac.end(), target_mac.begin(), ::toupper);
-            if (mac_upper != target_mac) continue;
+            // MAC 过滤: 00:00:70:27:80:48 → 广播反向: 48 80 27 70 00 00
+            if (x[2]!=0x48 || x[3]!=0x80 || x[4]!=0x27 || x[5]!=0x70 || x[6]!=0x00 || x[7]!=0x00) return;
             
-            // 4. 解析字段 (基于最新抓包校准)
-            auto &p = md.data;  // ✅ 这才是剥离 Company ID 后的有效负载
-            if (p.size() < 20) continue;
-            if (p[0] != 0x21) continue;  // 协议头校验
+            // 解析字段
+            bool power_on = (x[9] == 0x01);
+            bool fan_running = (x[18] & 0x01);
+            uint8_t fan_gear_idx = x[19];
+            uint16_t brt_raw = (x[14] << 8) | x[15];
             
-            uint8_t mode = p[10];
-            uint8_t brt_val = p[11];
-            uint8_t fan_idx = p[19];
+            // 发布到 HA
+            id(dev3_power).publish_state(power_on);
+            id(dev3_fan_running).publish_state(fan_running);
+            id(dev3_fan_speed).publish_state(fan_running ? (fan_gear_idx + 1) : 0);
+            id(dev3_brightness).publish_state(brt_raw == 0xFFFF ? 100 : (int)(brt_raw / 655.35));
             
-            bool light_on = (mode & 0x01);
-            bool fan_on = (mode != 0x10 && mode != 0x11);
-            int fan_speed = fan_on ? (fan_idx + 1) : 0;
-            int brightness = (brt_val * 100) / 255;
-            
-            // 5. 防冲突 & 发布状态
-            if (id(is_sending)) return;
-            
-            id(dev3_power).publish_state(light_on);
-            id(dev3_fan_running).publish_state(fan_on);
-            id(dev3_fan_speed).publish_state(fan_speed);
-            id(dev3_brightness).publish_state(brightness);
-            
-            ESP_LOGI("midea_ble", "✅ Dev3: Light=%d Fan=%d(Spd%d) BRT=%d%%",
-                     light_on, fan_on, fan_speed, brightness);
+            ESP_LOGI("Dev3_State", "Power=%d Fan=%d(Idx%d) BRT=%d%%", 
+                     power_on, fan_running, fan_gear_idx, (brt_raw==0xFFFF?100:(int)(brt_raw/655.35)));
           }
 
 # ========== Dev3 状态实体 ==========
