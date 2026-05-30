@@ -42,11 +42,10 @@ globals:
     initial_value: "0"
   - id: cmd_pkt
     type: std::vector<uint8_t>
-    initial_value: '{}'
+    initial_value: 'std::vector<uint8_t>()' #  显式指定为空的 vector 容器
   - id: end_pkt
     type: std::vector<uint8_t>
-    initial_value: '{}'
-
+    initial_value: 'std::vector<uint8_t>()' #  显式指定为空的 vector 容器
 # ========== 【新增】发射动作脚本 (解决动作队列溢出导致死机的核心) ==========
 # 使用 mode: restart，确保快速拖动滑块时，只会执行最后一次广播，取消排队中的冗余广播，极大节省内存。
 script:
