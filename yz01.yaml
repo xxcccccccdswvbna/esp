@@ -12,10 +12,15 @@ esp32:
     type: esp-idf
     version: recommended
     sdkconfig_options:
-      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"  # ✅ 动态蓝牙内存
-      CONFIG_SPIRAM: "y"                      # ✅ 启用 8MB PSRAM（关键！）
-      CONFIG_SPIRAM_USE: "y"
+      # ✅ 保留：动态分配蓝牙内存，避免初始化失败
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
+      
+      # ✅ 保留：提高系统实时性
       CONFIG_FREERTOS_HZ: "1000"
+      
+      # ✅ 保留：限制蓝牙连接数，节省内存
+      CONFIG_BT_ACL_CONNECTIONS: "3"
+      
 
 logger:
   level: INFO  # ✅ 改为 INFO，避免日志阻塞
