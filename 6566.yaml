@@ -50,32 +50,25 @@ esp32_ble_tracker:
         - lambda: |-
             if (x.size() < 20) return;
             if (x[0] != 0x21) return;
+            // MAC 过滤: 00:00:70:27:80:48 → 广播反向: 48 80 27 70 00 00
             if (x[2]!=0x48 || x[3]!=0x80 || x[4]!=0x27 || x[5]!=0x70 || x[6]!=0x00 || x[7]!=0x00) return;
             
+            // 解析字段
             bool power_on = (x[9] == 0x01);
             bool fan_running = (x[18] & 0x01);
             uint8_t fan_gear_idx = x[19];
             uint16_t brt_raw = (x[14] << 8) | x[15];
+            int brt_pct = (brt_raw == 0xFFFF) ? 100 : (int)(brt_raw / 655.35);
             
-            static bool last_power = false;
-            static uint8_t last_gear = 0;
-            static uint16_t last_brt = 0;
+            // ✅ 直接发布状态，确保首次上线能刷新 HA 实体
+            id(dev3_power).publish_state(power_on);
+            id(dev3_fan_running).publish_state(fan_running);
+            id(dev3_fan_speed).publish_state(fan_running ? (fan_gear_idx + 1) : 0);
+            id(dev3_brightness).publish_state(brt_pct);
             
-            if (power_on != last_power) {
-              id(dev3_power).publish_state(power_on);
-              last_power = power_on;
-            }
-            if (fan_running != id(dev3_fan_running).state) {
-              id(dev3_fan_running).publish_state(fan_running);
-            }
-            if (fan_running && fan_gear_idx != last_gear) {
-              id(dev3_fan_speed).publish_state(fan_gear_idx + 1);
-              last_gear = fan_gear_idx;
-            }
-            if (brt_raw != last_brt) {
-              id(dev3_brightness).publish_state(brt_raw == 0xFFFF ? 100 : (int)(brt_raw / 655.35));
-              last_brt = brt_raw;
-            }
+            // 调试日志（日志面板可见，确认是否收到数据）
+            ESP_LOGI("Dev3_State", "Power=%d Fan=%d Gear=%d BRT=%d%%", 
+                     power_on, fan_running, fan_gear_idx + 1, brt_pct);
 
 globals:
   - id: last_cmd_time
