@@ -6,9 +6,13 @@ esp32:
   board: esp32-c3-devkitm-1
   framework:
     type: esp-idf
+    # 🔹 降频至 80MHz 显著降低发热，性能仍足够 BLE+WiFi
+    sdkconfig_options:
+      CONFIG_ESP32C3_DEFAULT_CPU_FREQ_MHZ: "80"
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
 
 logger:
-  level: INFO
+  level: WARN  # 🔹 降日志级别，减少 Flash I/O 与 CPU 占用
   logs:
     esp32_ble_server: WARN
     esp32_ble_tracker: WARN
@@ -32,6 +36,7 @@ wifi:
     subnet: 255.255.255.0
     dns1: 192.168.6.1
 
+# 🔹 移除 bluetooth_proxy：ESP32-C3 内存仅 300KB，代理极易触发 OOM 重启
 esp32_ble:
   io_capability: none
 
@@ -62,9 +67,6 @@ esp32_ble_tracker:
             id(dev3_fan_running).publish_state(fan_running);
             id(dev3_fan_speed).publish_state(fan_running ? (fan_gear_idx + 1) : 0);
             id(dev3_brightness).publish_state(brt_pct);
-            
-            ESP_LOGI("Dev3_State", "Power=%d Fan=%d Gear=%d BRT=%d%%", 
-                     power_on, fan_running, fan_gear_idx + 1, brt_pct);
 
 globals:
   - id: last_cmd_time
@@ -73,14 +75,32 @@ globals:
   - id: cmd_pkt
     type: std::vector<uint8_t>
     initial_value: 'std::vector<uint8_t>{}'
-  # 🔹 Dev1 专属结束包
   - id: end_pkt_dev1
     type: std::vector<uint8_t>
     initial_value: '{0x11,0x4D,0x19,0x11,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x6E,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5D}'
-  # 🔹 Dev2 专属结束包
   - id: end_pkt_dev2
     type: std::vector<uint8_t>
     initial_value: '{0x11,0x4D,0x19,0x11,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0x1C,0x60,0xF0,0xF0,0xFC,0x3F,0xCF,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5E}'
+  - id: current_dev_id
+    type: int
+    initial_value: '1'
+
+# ========== 🔑 统一发送脚本（替代所有重复代码） ==========
+script:
+  - id: ble_send_unified
+    then:
+      - lambda: |-
+          if (millis() - id(last_cmd_time) < 100) return; // 统一防抖 100ms
+          id(last_cmd_time) = millis();
+          
+          // 按设备ID选择结束包
+          if (id(current_dev_id) == 1) {
+            id(ble_server).set_manufacturer_data(id(end_pkt_dev1));
+          } else {
+            id(ble_server).set_manufacturer_data(id(end_pkt_dev2));
+          }
+          // 发送控制包（无 delay，BLE 栈自动调度广播周期）
+          id(ble_server).set_manufacturer_data(id(cmd_pkt));
 
 number:
   # 🟦 Dev1 亮度
@@ -96,8 +116,7 @@ number:
     icon: mdi:brightness-6
     set_action:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return;
-          id(last_cmd_time) = millis();
+          id(current_dev_id) = 1;
           int val = (int)x;
           int snap = (val < 10) ? 0 : (val < 30) ? 20 : (val < 45) ? 40 : (val < 55) ? 50 : (val < 70) ? 60 : (val < 90) ? 80 : 100;
           id(dev1_brt).publish_state(snap);
@@ -112,9 +131,7 @@ number:
             case 100: p={0x11,0x4D,0x19,0x14,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x49,0xA6,0xA1,0x7F,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xEB}; break;
           }
           id(cmd_pkt) = p;
-      - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt_dev1));'
-      - delay: 50ms
-      - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
+      - script.execute: ble_send_unified
 
   # 🟦 Dev1 色温
   - platform: template
@@ -129,8 +146,7 @@ number:
     icon: mdi:thermometer
     set_action:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return;
-          id(last_cmd_time) = millis();
+          id(current_dev_id) = 1;
           int val = (int)x;
           int snap = (val < 3175) ? 2700 : (val < 4125) ? 3650 : (val < 5075) ? 4600 : (val < 6025) ? 5550 : 6500;
           id(dev1_ct).publish_state(snap);
@@ -143,9 +159,7 @@ number:
             case 6500: p={0x11,0x4D,0x19,0x14,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x49,0xA6,0xA5,0x7A,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xEA}; break;
           }
           id(cmd_pkt) = p;
-      - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt_dev1));'
-      - delay: 50ms
-      - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
+      - script.execute: ble_send_unified
 
   # 🟧 Dev2 亮度
   - platform: template
@@ -160,8 +174,7 @@ number:
     icon: mdi:brightness-6
     set_action:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return;
-          id(last_cmd_time) = millis();
+          id(current_dev_id) = 2;
           int val = (int)x;
           int snap = (val < 10) ? 0 : (val < 30) ? 20 : (val < 45) ? 40 : (val < 55) ? 50 : (val < 70) ? 60 : (val < 90) ? 80 : 100;
           id(dev2_brt).publish_state(snap);
@@ -176,9 +189,7 @@ number:
             case 100: p={0x11,0x4D,0x19,0x1A,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0x2C,0x2C,0x21,0x8F,0x00,0x5C,0xBF,0x1D,0x60,0xF0,0xF0,0xFC,0x3F,0xCF,0x9C}; break;
           }
           id(cmd_pkt) = p;
-      - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt_dev2));'
-      - delay: 50ms
-      - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
+      - script.execute: ble_send_unified
 
   # 🟧 Dev2 色温
   - platform: template
@@ -193,8 +204,7 @@ number:
     icon: mdi:thermometer
     set_action:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return;
-          id(last_cmd_time) = millis();
+          id(current_dev_id) = 2;
           int val = (int)x;
           int snap = (val < 3100) ? 2700 : (val < 5000) ? 3500 : 6500;
           id(dev2_ct).publish_state(snap);
@@ -205,14 +215,11 @@ number:
             case 6500: p={0x11,0x4D,0x19,0x17,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xCE,0xCE,0xC8,0xD2,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x1D,0x60,0xF0,0xF0,0xAB}; break;
           }
           id(cmd_pkt) = p;
-      - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt_dev2));'
-      - delay: 50ms
-      - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
+      - script.execute: ble_send_unified
 
-# ========== 风扇控制 (下拉菜单) ==========
 select:
   # 🟦 Dev1 风扇
-  - platform: template  # ✅ 必须改为 template
+  - platform: template
     name: "Dev1 Fan Speed Select"
     id: dev1_fan_select
     icon: mdi:fan-speed
@@ -220,7 +227,7 @@ select:
     optimistic: true
     set_action:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
+          id(current_dev_id) = 1;
           int lvl = x == "1 档" ? 1 : x == "2 档" ? 2 : x == "3 档" ? 3 : x == "4 档" ? 4 : x == "5 档" ? 5 : 6;
           std::vector<uint8_t> p;
           switch(lvl) {
@@ -232,12 +239,10 @@ select:
             case 6: p={0x11,0x4D,0x19,0x17,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x81,0x80,0x11,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0x2F}; break;
           }
           id(cmd_pkt) = p;
-      - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt_dev1));'
-      - delay: 50ms
-      - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
+      - script.execute: ble_send_unified
 
   # 🟧 Dev2 风扇
-  - platform: template  # ✅ 必须改为 template
+  - platform: template
     name: "Dev2 Fan Speed Select"
     id: dev2_fan_select
     icon: mdi:fan-speed
@@ -245,7 +250,7 @@ select:
     optimistic: true
     set_action:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
+          id(current_dev_id) = 2;
           int lvl = x == "1 档" ? 1 : x == "2 档" ? 2 : x == "3 档" ? 3 : x == "4 档" ? 4 : x == "5 档" ? 5 : 6;
           std::vector<uint8_t> p;
           switch(lvl) {
@@ -257,77 +262,62 @@ select:
             case 6: p={0x11,0x4D,0x19,0x13,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xF1,0xF0,0x7A,0x3F,0xCF,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x95}; break;
           }
           id(cmd_pkt) = p;
-      - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt_dev2));'
-      - delay: 50ms
-      - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
+      - script.execute: ble_send_unified
 
-# ========== 按钮控制 ==========
 button:
   - platform: template
     name: "Dev1 Light Toggle"
     icon: mdi:lightbulb
     on_press:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
+          id(current_dev_id) = 1;
           id(cmd_pkt) = {0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x86,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x40};
-      - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt_dev1));'
-      - delay: 50ms
-      - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
+      - script.execute: ble_send_unified
 
   - platform: template
     name: "Dev1 Fan Toggle"
     icon: mdi:fan
     on_press:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
+          id(current_dev_id) = 1;
           id(cmd_pkt) = {0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x89,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x43};
-      - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt_dev1));'
-      - delay: 50ms
-      - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
+      - script.execute: ble_send_unified
 
   - platform: template
     name: "Dev1 Fan Reverse"
     icon: mdi:sync-reverse
     on_press:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
+          id(current_dev_id) = 1;
           id(cmd_pkt) = {0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x9C,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x56};
-      - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt_dev1));'
-      - delay: 50ms
-      - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
+      - script.execute: ble_send_unified
 
   - platform: template
     name: "Dev2 Light Toggle"
     icon: mdi:lightbulb
     on_press:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
+          id(current_dev_id) = 2;
           id(cmd_pkt) = {0x11,0x4D,0x19,0x13,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xF1,0xF0,0xFA,0x3F,0xCF,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x15};
-      - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt_dev2));'
-      - delay: 50ms
-      - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
+      - script.execute: ble_send_unified
 
   - platform: template
     name: "Dev2 Fan Toggle"
     icon: mdi:fan
     on_press:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
+          id(current_dev_id) = 2;
           id(cmd_pkt) = {0x11,0x4D,0x19,0x11,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0x1C,0x60,0xF9,0xF0,0xFC,0x3F,0xCF,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x57};
-      - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt_dev2));'
-      - delay: 50ms
-      - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
+      - script.execute: ble_send_unified
 
   - platform: template
     name: "Dev2 Fan Reverse"
     icon: mdi:sync-reverse
     on_press:
       - lambda: |-
-          if (millis() - id(last_cmd_time) < 300) return; id(last_cmd_time) = millis();
+          id(current_dev_id) = 2;
           id(cmd_pkt) = {0x11,0x4D,0x19,0x15,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xFD,0x3F,0x49,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x1D,0x60,0x78};
-      - lambda: 'id(ble_server).set_manufacturer_data(id(end_pkt_dev2));'
-      - delay: 50ms
-      - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
+      - script.execute: ble_send_unified
 
 binary_sensor:
   - platform: template
