@@ -1,0 +1,166 @@
+esphome:
+  name: midea-dual-control
+  friendly_name: Midea Dual Control
+  on_boot:
+    - priority: 600
+      then:
+        - delay: 2s  # ✅ 让射频初始化完成
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+    version: recommended
+    sdkconfig_options:
+      CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"  # ✅ 动态蓝牙内存
+      CONFIG_SPIRAM: "y"                      # ✅ 启用 8MB PSRAM（关键！）
+      CONFIG_SPIRAM_USE: "y"
+      CONFIG_FREERTOS_HZ: "1000"
+
+logger:
+  level: INFO  # ✅ 改为 INFO，避免日志阻塞
+  logs:
+    esp32_ble: WARN
+    esp32_ble_tracker: WARN
+    midea_ble: INFO  # ✅ 仅保留关键业务日志
+
+api:
+  encryption:
+    key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
+  reboot_timeout: 1h
+
+ota:
+  platform: esphome
+  password: "chen1122"
+
+wifi:
+  ssid: "CC"
+  password: "chen1122"
+  power_save_mode: none  # ✅ 必须为 none，避免休眠暂停蓝牙
+
+# ❌ 移除 bluetooth_proxy（与本地扫描冲突）
+# bluetooth_proxy:
+#   active: true
+
+esp32_ble:
+  io_capability: none
+
+esp32_ble_server:
+  id: ble_server
+  manufacturer_data: []
+
+# ========== 全局变量 ==========
+globals:
+  - id: last_cmd_time
+    type: uint32_t
+    initial_value: '0'
+  - id: cmd_pkt
+    type: std::vector<uint8_t>
+    initial_value: 'std::vector<uint8_t>{}'
+  - id: end_pkt
+    type: std::vector<uint8_t>
+    initial_value: 'std::vector<uint8_t>{}'
+  - id: is_sending
+    type: bool
+    initial_value: 'false'
+
+# ========== 清空广播脚本 ==========
+script:
+  - id: clear_broadcast
+    then:
+      - delay: 500ms
+      - lambda: |-
+          std::vector<uint8_t> empty(26, 0x00);
+          id(ble_server).set_manufacturer_data(empty);
+      - delay: 500ms
+      - globals.set: {id: is_sending, value: 'false'}
+
+# ========== 控制实体 (Dev1/Dev2) - 完全保留 ==========
+# 🟦 Dev1 亮度/色温/风扇 + 🟧 Dev2 亮度/色温/风扇 + 按钮
+# ← 此处完全复用你原有的 number/select/button 配置，无需修改
+# （为节省篇幅省略，实际使用时请保留原控制代码）
+
+# ========== ✅ 优化版 Dev3 状态监听 (本地扫描) ==========
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 320ms   # ✅ S3 建议宽松值，避免与 Wi-Fi 抢占
+    window: 300ms
+    active: false     # ✅ 被动扫描更稳定，避免主动请求干扰广播
+    continuous: true
+    # channel: 37    # 🔍 调试时可取消注释，强制单频道测试
+  on_ble_manufacturer_data_advertise:  # ✅ 改用官方厂商数据监听器（更可靠）
+    - manufacturer_id: "134D"
+      then:
+        - lambda: |-
+            // 1. MAC 过滤（转大写比对，避免格式差异）
+            std::string raw_mac = x.address_str();
+            std::string target_mac = "00:00:70:27:80:48";
+            std::transform(raw_mac.begin(), raw_mac.end(), raw_mac.begin(), ::toupper);
+            std::transform(target_mac.begin(), target_mac.end(), target_mac.begin(), ::toupper);
+            if (raw_mac != target_mac) return;
+            
+            // 2. 解析字段 (基于抓包校准)
+            auto &p = x;  // x 已是剥离 Company ID 后的有效负载
+            if (p.size() < 20) return;
+            if (p[0] != 0x21) return;  // 协议头校验
+            
+            uint8_t mode = p[10];
+            uint8_t brt_val = p[11];
+            uint8_t fan_idx = p[19];
+            
+            bool light_on = (mode & 0x01);
+            bool fan_on = (mode != 0x10 && mode != 0x11);
+            int fan_speed = fan_on ? (fan_idx + 1) : 0;
+            int brightness = (brt_val * 100) / 255;
+            
+            // 3. 防冲突 & 发布状态
+            if (id(is_sending)) return;
+            
+            id(dev3_power).publish_state(light_on);
+            id(dev3_fan_running).publish_state(fan_on);
+            id(dev3_fan_speed).publish_state(fan_speed);
+            id(dev3_brightness).publish_state(brightness);
+            
+            ESP_LOGI("midea_ble", "✅ Dev3: Light=%d Fan=%d(Spd%d) BRT=%d%%",
+                     light_on, fan_on, fan_speed, brightness);
+
+# ========== Dev3 状态实体 ==========
+binary_sensor:
+  - platform: template
+    name: "Dev3 Light Power"
+    id: dev3_power
+    device_class: light
+    icon: mdi:ceiling-light
+  - platform: template
+    name: "Dev3 Fan Running"
+    id: dev3_fan_running
+    device_class: running
+    icon: mdi:fan
+
+sensor:
+  - platform: template
+    name: "Dev3 Fan Speed"
+    id: dev3_fan_speed
+    unit_of_measurement: "档"
+    accuracy_decimals: 0
+    icon: mdi:numeric
+  - platform: template
+    name: "Dev3 Brightness"
+    id: dev3_brightness
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    icon: mdi:brightness-percent
+
+# ========== 网络看门狗 ==========
+interval:
+  - interval: 60s
+    then:
+      - lambda: |-
+          static uint32_t last_ok = 0;
+          if (network::is_connected()) {
+            last_ok = millis();
+          } else if (millis() - last_ok > 180000) {
+            ESP_LOGW("Watchdog", "Network lost >3min, rebooting...");
+            delay(100);
+            App.reboot();
+          }
