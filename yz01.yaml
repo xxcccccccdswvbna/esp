@@ -88,29 +88,30 @@ script:
 # ========== ✅ 优化版 Dev3 状态监听 (本地扫描) ==========
 # ========== 替换你当前的 esp32_ble_tracker ==========
 # ========== ✅ 修正版 Dev3 状态监听 ==========
+# ========== 修正版 Dev3 状态监听 (纯 ASCII) ==========
 esp32_ble_tracker:
   scan_parameters:
-    interval: 1000ms    # ✅ 宽松间隔，避免与 WiFi 冲突
+    interval: 1000ms
     window: 500ms
-    active: false       # ✅ 被动扫描，稳定优先
+    active: false
     continuous: true
   on_ble_manufacturer_data_advertise:
     - manufacturer_id: "134D"
       then:
         - lambda: |-
             if (x.size() < 20) return;
-            if (x[0] != 0x21) return;  // 协议头过滤
+            if (x[0] != 0x21) return;
             
-            // MAC 过滤: 00:00:70:27:80:48 → 广播反向: 48 80 27 70 00 00
+            // MAC filter: 00:00:70:27:80:48 -> reversed: 48 80 27 70 00 00
             if (x[2]!=0x48 || x[3]!=0x80 || x[4]!=0x27 || x[5]!=0x70 || x[6]!=0x00 || x[7]!=0x00) return;
             
-            // 解析字段
+            // Parse fields
             bool power_on = (x[9] == 0x01);
             bool fan_running = (x[18] & 0x01);
             uint8_t fan_gear_idx = x[19];
             uint16_t brt_raw = (x[14] << 8) | x[15];
             
-            // 发布到 HA
+            // Publish to HA
             id(dev3_power).publish_state(power_on);
             id(dev3_fan_running).publish_state(fan_running);
             id(dev3_fan_speed).publish_state(fan_running ? (fan_gear_idx + 1) : 0);
@@ -118,7 +119,6 @@ esp32_ble_tracker:
             
             ESP_LOGI("Dev3_State", "Power=%d Fan=%d(Idx%d) BRT=%d%%", 
                      power_on, fan_running, fan_gear_idx, (brt_raw==0xFFFF?100:(int)(brt_raw/655.35)));
-            # ← 注意：这里不要加 }，lambda 通过缩进自动结束
 
 # ========== Dev3 状态实体 ==========
 binary_sensor:
