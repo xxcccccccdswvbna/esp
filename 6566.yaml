@@ -212,7 +212,7 @@ number:
 # ========== 风扇控制 (下拉菜单) ==========
 select:
   # 🟦 Dev1 风扇
-  - platform: select
+  - platform: template  # ✅ 必须改为 template
     name: "Dev1 Fan Speed Select"
     id: dev1_fan_select
     icon: mdi:fan-speed
@@ -237,7 +237,7 @@ select:
       - lambda: 'id(ble_server).set_manufacturer_data(id(cmd_pkt));'
 
   # 🟧 Dev2 风扇
-  - platform: select
+  - platform: template  # ✅ 必须改为 template
     name: "Dev2 Fan Speed Select"
     id: dev2_fan_select
     icon: mdi:fan-speed
