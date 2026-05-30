@@ -8,8 +8,10 @@ esp32:
     type: esp-idf
     version: recommended
     sdkconfig_options:
+      # ✅ 保留：动态分配蓝牙内存，避免初始化失败
       CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
-      CONFIG_FREERTOS_HZ: "1000"
+      
+      # ❌ 移除：CONFIG_FREERTOS_HZ: "1000"  ← 此行已删除，恢复默认稳定性
 
 logger:
   level: INFO
