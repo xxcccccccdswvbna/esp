@@ -28,13 +28,19 @@ api:
     key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
   reboot_timeout: 1h
 
+# OTA：同时支持 ① dashboard/CLI ② 网页上传
 ota:
-  platform: esphome
-  password: "chen1122"
+  - platform: esphome
+    password: "chen1122"
+  - platform: web_server   # 关键：开启网页 OTA 上传
 
+# Web 控制台 + Web OTA（浏览器访问 http://192.168.6.82）
 web_server:
   port: 80
   version: 2
+  auth:
+    username: admin
+    password: chen1122
 
 wifi:
   ssid: "CC"
@@ -42,7 +48,7 @@ wifi:
   power_save_mode: none
   fast_connect: true
   manual_ip:
-    static_ip: 192.168.6.72
+    static_ip: 192.168.6.82
     gateway: 192.168.6.1
     subnet: 255.255.255.0
     dns1: 192.168.6.1
