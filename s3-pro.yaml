@@ -7,96 +7,104 @@ esp32:
   framework:
     type: esp-idf
     sdkconfig_options:
-      # 🔹 S3 专属优化：双核 240MHz + 缓存配置
       CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
-      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
-      CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB: "y"
-      # 🔹 BLE 栈：加大内存（S3 有 512KB SRAM，代理需更多缓冲）
-      CONFIG_BT_NIMBLE_TASK_STACK_SIZE: "10240"  # 🔹 代理需更大栈空间
+
+      CONFIG_BT_NIMBLE_TASK_STACK_SIZE: "10240"
       CONFIG_BT_BLE_DYNAMIC_ENV_MEMORY: "y"
-      CONFIG_NVS_ENC_ENABLE: "y"
-      # 🔹 启用 Native USB（方便调试）
-      CONFIG_ESP32S3_USB_OTG: "y"
 
 logger:
-  level: WARN
+  level: INFO
   logs:
-    esp32_ble_server: WARN
-    esp32_ble_tracker: WARN
-    wifi: WARN
-    bluetooth_proxy: WARN  # 🔹 新增：代理日志级别
+    esp32_ble_tracker: INFO
+    bluetooth_proxy: INFO
 
 api:
   encryption:
     key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
-  reboot_timeout: 1h
 
-# OTA：同时支持 ① dashboard/CLI ② 网页上传
 ota:
   - platform: esphome
     password: "chen1122"
+
   - platform: web_server
 
-# Web 控制台 + Web OTA（浏览器访问 http://192.168.6.82）
 web_server:
   port: 80
-  version: 2
 
 wifi:
   ssid: "CC"
   password: "chen1122"
+
   power_save_mode: none
   fast_connect: true
+
   manual_ip:
     static_ip: 192.168.6.82
     gateway: 192.168.6.1
     subnet: 255.255.255.0
     dns1: 192.168.6.1
+
   reboot_timeout: 5min
+
   ap:
     ssid: "Midea-Control-AP"
     password: "chen1122"
-    ap_timeout: 1min
 
-# 🔹 基础 BLE 配置
 esp32_ble:
-  io_capability: none
-  # 🔹 代理需启用以下参数
   enable_on_boot: true
+  io_capability: none
 
-# 🔹 蓝牙代理（核心新增）
 bluetooth_proxy:
-  active: true  # 🔹 启用主动代理模式
-  cache_services: true  # 🔹 缓存服务特征，提升连接速度
+  active: true
+  cache_services: true
+  connection_slots: 3
 
-# 🔹 BLE Server（美的控制专用，与代理共存）
 esp32_ble_server:
   id: ble_server
   manufacturer_data: []
 
-# 🔹 BLE Tracker（接收设备广播，与代理共存）
 esp32_ble_tracker:
   scan_parameters:
-    interval: 1000ms
-    window: 50ms
-    active: false
+    active: true
+    continuous: true
+    interval: 320ms
+    window: 320ms
+
   on_ble_manufacturer_data_advertise:
     - manufacturer_id: "134D"
       then:
         - lambda: |-
             if (x.size() < 20) return;
+
             if (x[0] != 0x21) return;
-            if (x[2]!=0x48 || x[3]!=0x80 || x[4]!=0x27 || x[5]!=0x70 || x[6]!=0x00 || x[7]!=0x00) return;
-            
+
+            if (
+              x[2] != 0x48 ||
+              x[3] != 0x80 ||
+              x[4] != 0x27 ||
+              x[5] != 0x70 ||
+              x[6] != 0x00 ||
+              x[7] != 0x00
+            ) return;
+
             bool power_on = (x[9] == 0x01);
             bool fan_running = (x[18] & 0x01);
+
             uint8_t fan_gear_idx = x[19];
-            uint16_t brt_raw = (x[14] << 8) | x[15];
-            int brt_pct = (brt_raw == 0xFFFF) ? 100 : (int)(brt_raw / 655.35);
-            
+
+            uint16_t brt_raw =
+              (x[14] << 8) | x[15];
+
+            int brt_pct =
+              (brt_raw == 0xFFFF)
+              ? 100
+              : (int)(brt_raw / 655.35);
+
             id(dev3_power).publish_state(power_on);
             id(dev3_fan_running).publish_state(fan_running);
-            id(dev3_fan_speed).publish_state(fan_running ? (fan_gear_idx + 1) : 0);
+            id(dev3_fan_speed).publish_state(
+              fan_running ? fan_gear_idx + 1 : 0
+            );
             id(dev3_brightness).publish_state(brt_pct);
 
 globals:
