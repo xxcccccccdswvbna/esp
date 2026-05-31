@@ -1,4 +1,4 @@
-name: Build & Release ESPHome
+name: Build & Release ESPHome (永久保存固件)
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: 检测变更 YAML
+      - name: 检测修改的 YAML
         id: changed
         run: |
           FILES=$(git diff --name-only HEAD^ HEAD \
@@ -36,20 +36,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build
+      - name: 编译 ESPHome 固件
         uses: esphome/build-action@v6
         with:
           yaml-file: ${{ matrix.yaml }}
 
-      - name: 收集 BIN
+      - name: 收集所有 BIN 文件
         run: |
           mkdir -p output
-          find .esphome/build -type f -name "*.bin" -exec cp -f {} output/ \;
+          find .esphome/build -name "*.bin" -exec cp {} output/ \;
 
-      - name: 上传到 Release（永久保存）
+      # 自动生成时间标签（解决报错：需要一个标签）
+      - name: 生成版本标签
+        id: tag
+        run: |
+          TAG="build-$(date +%Y%m%d-%H%M%S)"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      # 自动发布到 Release（永久保存）
+      - name: 发布到 GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          tag_name: ${{ steps.tag.outputs.tag }}  # 关键：必须加 tag
+          name: "ESPHome 固件 ${{ steps.tag.outputs.tag }}"
+          body: "自动编译：${{ matrix.yaml }}"
           files: output/*.bin
+          generate_release_notes: true
+          overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
