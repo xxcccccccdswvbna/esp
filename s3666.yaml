@@ -1,6 +1,6 @@
 esphome:
-  name: midea-dual-control
-  friendly_name: Midea Dual Control
+  name: esp-s3
+  friendly_name: esp-s3
 
 esp32:
   board: esp32-s3-devkitc-1  # 🔹 改为 S3 开发板
