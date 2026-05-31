@@ -1,4 +1,4 @@
-name: Build & Release ESPHome (永久保存固件)
+name: Build & Release ESPHome
 
 on:
   workflow_dispatch:
@@ -6,62 +6,75 @@ on:
     paths:
       - "**/*.yaml"
 
+permissions:
+  contents: write
+
 jobs:
   detect:
     runs-on: ubuntu-latest
     outputs:
       files: ${{ steps.changed.outputs.files }}
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: 检测修改的 YAML
+      - name: 检测修改 YAML
         id: changed
         run: |
           FILES=$(git diff --name-only HEAD^ HEAD \
             | grep '\.yaml$' \
             | jq -R -s -c 'split("\n")[:-1]')
+
+          if [ -z "$FILES" ]; then
+            FILES="[]"
+          fi
+
           echo "files=$FILES" >> $GITHUB_OUTPUT
 
   build:
     needs: detect
     if: needs.detect.outputs.files != '[]'
     runs-on: ubuntu-latest
+
     strategy:
-      fail-fast: false
       matrix:
         yaml: ${{ fromJson(needs.detect.outputs.files) }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: 编译 ESPHome 固件
+      - name: 编译 ESPHome
         uses: esphome/build-action@v6
         with:
           yaml-file: ${{ matrix.yaml }}
 
-      - name: 收集所有 BIN 文件
+      - name: 收集固件
         run: |
           mkdir -p output
           find .esphome/build -name "*.bin" -exec cp {} output/ \;
 
-      # 自动生成时间标签（解决报错：需要一个标签）
-      - name: 生成版本标签
+      - name: 生成版本号
         id: tag
         run: |
-          TAG="build-$(date +%Y%m%d-%H%M%S)"
+          TAG=$(date +'%Y%m%d-%H%M%S')
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
-      # 自动发布到 Release（永久保存）
-      - name: 发布到 GitHub Releases
+      - name: 发布 Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}  # 关键：必须加 tag
-          name: "ESPHome 固件 ${{ steps.tag.outputs.tag }}"
-          body: "自动编译：${{ matrix.yaml }}"
+          tag_name: build-${{ steps.tag.outputs.tag }}
+          name: ESPHome-${{ steps.tag.outputs.tag }}
+          body: |
+            自动编译生成
+
+            YAML:
+            ${{ matrix.yaml }}
+
           files: output/*.bin
-          generate_release_notes: true
-          overwrite: true
+          overwrite_files: true
+          generate_release_notes: false
+
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
