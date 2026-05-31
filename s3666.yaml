@@ -38,9 +38,7 @@ ota:
 web_server:
   port: 80
   version: 2
-  auth:
-    username: admin
-    password: chen1122
+
 
 wifi:
   ssid: "CC"
