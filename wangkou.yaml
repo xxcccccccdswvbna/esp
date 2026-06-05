@@ -1,0 +1,39 @@
+esphome:
+  name: esp32c6-lan
+
+esp32:
+  board: esp32-c6-devkitm-1
+  variant: esp32c6
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+
+ota:
+
+ethernet:
+  type: W5500
+
+  clk_pin: GPIO6
+  mosi_pin: GPIO7
+  miso_pin: GPIO2
+
+  cs_pin: GPIO10
+  interrupt_pin: GPIO4
+  reset_pin: GPIO5
+
+  domain: .lan
+
+web_server:
+  port: 80
+
+text_sensor:
+  - platform: ethernet_info
+    ip_address:
+      name: Ethernet IP
+    dns_address:
+      name: Ethernet DNS
+    mac_address:
+      name: Ethernet MAC
