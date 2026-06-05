@@ -31,7 +31,7 @@ ethernet:
 
   cs_pin: GPIO23
 
-  interrupt_pin: GPIO4
-  reset_pin: GPIO5
+  interrupt_pin: GPI21
+  reset_pin: GPI22
 
   clock_speed: 8000000
