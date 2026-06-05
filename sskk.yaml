@@ -15,8 +15,8 @@ esp32:
 
 # ✅ 启用 WiFi
 wifi:
-  ssid: "HUAWEI_B311_1E53"
-  password: "12345678"
+  ssid: "CC"
+  password: "chen1122"
   
   # 如果 WiFi 连接失败，启用备用 AP 模式
   ap:
