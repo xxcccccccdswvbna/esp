@@ -9,6 +9,11 @@ esp32:
 
 esp32_ble:
   io_capability: none
+  
+# 保持原有配置不变，仅在末尾追加：
+esp32_ble_server:
+  id: ble_server
+  manufacturer_data: []  
 
 # ✅ 仅保留网络和 API
 wifi:
