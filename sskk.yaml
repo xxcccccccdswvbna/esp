@@ -8,32 +8,65 @@ esp32:
   framework:
     type: esp-idf
 
-# ✅ 尝试 W5500 配置
-ethernet:
-  type: DM9051
-  clk_pin: GPIO10
-  mosi_pin: GPIO11
-  miso_pin: GPIO12
-  cs_pin: GPIO13
-  # interrupt_pin: GPIO4
+# ❌ 以太网已禁用
+# ethernet:
+#   type: W5500
+#   ...
 
+# ✅ 启用 WiFi
+wifi:
+  ssid: "HUAWEI_B311_1E53"
+  password: "12345678"
+  
+  # 如果 WiFi 连接失败，启用备用 AP 模式
+  ap:
+    ssid: "C6-Gateway-Fallback"
+    password: "chen1122"
 
+# 启用 captive portal（首次配置用）
+captive_portal:
+
+# API 配置（Home Assistant 连接）
 api:
   encryption:
     key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
 
+# OTA 升级
 ota:
   - platform: esphome
     password: "chen1122"
   - platform: web_server
 
+# Web 控制台
 web_server:
   port: 80
   version: 2
 
+# 日志
 logger:
-  level: DEBUG  # 开启 DEBUG 方便看以太网日志
+  level: INFO
+
+# 功能组件
+binary_sensor:
+  - platform: status
+    name: "Connection Status"
 
 sensor:
   - platform: uptime
-    name: "Uptime"
+    name: "System Uptime"
+  - platform: wifi_signal
+    name: "WiFi Signal Strength"
+    update_interval: 60s
+
+button:
+  - platform: restart
+    name: "Reboot Device"
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "WiFi IP Address"
+    ssid:
+      name: "Connected SSID"
+    bssid:
+      name: "Connected BSSID"
