@@ -33,4 +33,3 @@ ethernet:
   interrupt_pin: 21
   reset_pin: 22
 
-  clock_speed: 1000000
