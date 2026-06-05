@@ -7,17 +7,8 @@ esp32:
   board: esp32-c6-devkitc-1
   variant: ESP32C6
   framework:
-    type: esp-idf
-    version: recommended
-    # 🔹 C6 专属 SDK 配置（精简蓝牙栈）
-    sdkconfig_options:
-      CONFIG_ESP32C6_DEFAULT_CPU_FREQ_160: "y"
-      CONFIG_ESP32C6_DATA_CACHE_64KB: "y"
-      CONFIG_BT_NIMBLE_ENABLED: "y"
-      CONFIG_BT_NIMBLE_ROLE_BROADCASTER: "y"
-      CONFIG_BT_NIMBLE_ROLE_OBSERVER: "y"
-      CONFIG_BT_NIMBLE_ROLE_PERIPHERAL: "y"
-      CONFIG_BT_NIMBLE_TASK_STACK_SIZE: "6144"  # 🔹 精简栈大小
+    type: arduino  # ← 关键：改用 Arduino 框架
+    # 移除所有 sdkconfig_options（Arduino 不需要）
 
 logger:
   level: WARN
