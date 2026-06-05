@@ -28,10 +28,9 @@ ethernet:
   clk_pin: GPIO19
   mosi_pin: GPIO18
   miso_pin: GPIO20
-
   cs_pin: GPIO23
 
-  interrupt_pin: GPI021
-  reset_pin: GPI022
+  interrupt_pin: 21
+  reset_pin: 22
 
-  clock_speed: 8000000
+  clock_speed: 1000000
