@@ -29,7 +29,7 @@ ethernet:
   mosi_pin: GPIO20
   miso_pin: GPIO18
   cs_pin: GPIO23
-  reset_pin: GPIO21
-  interrupt_pin: GPIO22
+  reset_pin: GPIO22
+  interrupt_pin: GPIO21
 
 
