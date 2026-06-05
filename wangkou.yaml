@@ -30,6 +30,5 @@ ethernet:
   miso_pin: 18
   cs_pin: 23
 
-  interrupt_pin: 21
-  reset_pin: 22
-
+  interrupt_pin: 22
+  reset_pin: 21
