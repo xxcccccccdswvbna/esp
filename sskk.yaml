@@ -17,9 +17,6 @@ ethernet:
   cs_pin: GPIO13
   # interrupt_pin: GPIO4
 
-wifi:
-  ssid: "HUAWEI_B311_1E53"
-  password: "12345678"
 
 api:
   encryption:
