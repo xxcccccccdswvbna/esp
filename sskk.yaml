@@ -8,51 +8,36 @@ esp32:
   framework:
     type: esp-idf
 
-# ✅ 核心配置：以太网 (Ethernet) - 已修正 type 值
+# ✅ 尝试 W5500 配置
 ethernet:
-  type: IP101           # ← 修正这里：去掉 "GR" 后缀
-  mdc_pin: GPIO20
-  mdio_pin: GPIO21
-  clk_mode: GPIO0_IN
-  phy_addr: 0
+  type: W5500
+  clk_pin: GPIO10    # ESP32-C6 默认 SPI 时钟
+  mosi_pin: GPIO11   # 默认 MOSI
+  miso_pin: GPIO12   # 默认 MISO
+  cs_pin: GPIO13     # 默认 片选
+  # interrupt_pin: GPIO4  # 如果编译报错缺中断，取消注释并尝试 GPIO4/5/6
+  # reset_pin: GPIO5      # 如果连不上，取消注释并尝试 GPIO5/15
 
-# API 配置 (接入 Home Assistant)
+wifi:
+  ssid: "HUAWEI_B311_1E53"
+  password: "12345678"
+
 api:
   encryption:
     key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
-  reboot_timeout: 1h
 
-# OTA 配置
 ota:
   - platform: esphome
     password: "chen1122"
   - platform: web_server
 
-# Web 控制台
 web_server:
   port: 80
   version: 2
 
 logger:
-  level: INFO
-
-# 功能组件
-binary_sensor:
-  - platform: status
-    name: "Ethernet Status"
+  level: DEBUG  # 开启 DEBUG 方便看以太网日志
 
 sensor:
   - platform: uptime
-    name: "System Uptime"
-  - platform: wifi_signal
-    name: "WiFi Signal"
-    update_interval: 60s
-
-button:
-  - platform: restart
-    name: "Reboot Device"
-
-text_sensor:
-  - platform: ethernet_info
-    ip_address:
-      name: "Ethernet IP"
+    name: "Uptime"
