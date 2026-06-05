@@ -22,7 +22,7 @@ ota:
   - platform: web_server
 
 # 🔹 Web 控制台
-web_server:
+ web_server:
   port: 80
   version: 2
 spi:
@@ -36,5 +36,3 @@ ethernet:
   interrupt_pin: GPIO4
   reset_pin: GPIO5
 
-web_server:
-  port: 80
