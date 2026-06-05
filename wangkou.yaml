@@ -24,10 +24,13 @@ web_server:
 
 ethernet:
   type: W5500
+
   clk_pin: GPIO19
-  mosi_pin: GPIO18
-  miso_pin: GPIO20
+
+  mosi_pin: GPIO20
+  miso_pin: GPIO18
+
   cs_pin: GPIO23
-  reset_pin: GPIO9  # <--- 关键！请根据你的原理图或测量结果修改这个号码
+
 
 
