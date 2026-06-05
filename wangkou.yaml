@@ -30,5 +30,3 @@ ethernet:
   miso_pin: GPIO20
   cs_pin: GPIO23
 
-  interrupt_pin: -1
-  reset_pin: -1
