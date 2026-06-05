@@ -10,6 +10,12 @@ esp32:
 esp32_ble:
   io_capability: none
   
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1000ms
+    window: 50ms
+    active: false 
+  
 # 保持原有配置不变，仅在末尾追加：
 esp32_ble_server:
   id: ble_server
