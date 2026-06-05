@@ -4,11 +4,9 @@ esphome:
   min_version: 2024.6.0
 
 esp32:
-  board: esp32-c6-devkitc-1
-  variant: ESP32C6
   framework:
-    type: arduino  # ← 关键：改用 Arduino 框架
-    # 移除所有 sdkconfig_options（Arduino 不需要）
+    type: esp-idf
+    version: 5.1.2  # ← 尝试旧版，不要用 recommended
 
 logger:
   level: WARN
