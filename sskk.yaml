@@ -1,0 +1,66 @@
+esphome:
+  name: c6-eth-gateway
+  friendly_name: "C6 Ethernet Gateway"
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: ESP32C6
+  framework:
+    type: esp-idf
+
+# 核心配置：以太网 (Ethernet)
+# 注意：如果网络不通，请将 type 改为 LAN8720 重新刷入
+ethernet:
+  type: IP101GR       # 这种国产板子通常用 IP101GR 或 LAN8720
+  mdc_pin: GPIO20     # ESP32-C6 标准 RMII 引脚
+  mdio_pin: GPIO21
+  clk_mode: GPIO0_IN
+  phy_addr: 0
+
+# 必须开启 API 才能接入 HA
+api:
+  encryption:
+    key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
+  reboot_timeout: 1h
+
+# OTA：同时支持 ① dashboard/CLI ② 网页上传
+ota:
+  - platform: esphome
+    password: "chen1122"
+  - platform: web_server
+
+# Web 控制台 + Web OTA（浏览器访问 http://192.168.6.82）
+web_server:
+  port: 80
+  version: 2
+
+# 日志输出，方便调试
+logger:
+  level: INFO
+
+# 功能模块
+binary_sensor:
+  # 显示以太网连接状态
+  - platform: status
+    name: "Ethernet Status"
+
+sensor:
+  # 显示设备运行时间
+  - platform: uptime
+    name: "System Uptime"
+    
+  # 显示 Wi-Fi 信号强度 (虽然主要用网线，但 C6 有 Wi-Fi)
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
+
+# 远程重启按钮
+button:
+  - platform: restart
+    name: "Reboot Device"
+
+# 在 HA 中显示获取到的 IP 地址
+text_sensor:
+  - platform: ethernet_info
+    ip_address:
+      name: "Ethernet IP"
