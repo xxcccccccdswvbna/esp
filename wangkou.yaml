@@ -1,39 +1,40 @@
 esphome:
-  name: esp32c6-lan
+  name: esp32c6-eth
 
 esp32:
   board: esp32-c6-devkitm-1
-  variant: esp32c6
   framework:
     type: esp-idf
 
 logger:
+  level: DEBUG
 
+# 🔹 API + 加密
 api:
+  encryption:
+    key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
+  reboot_timeout: 1h
 
+# 🔹 OTA 双模式
 ota:
+  - platform: esphome
+    password: "chen1122"
+  - platform: web_server
 
-ethernet:
-  type: W5500
-
+# 🔹 Web 控制台
+web_server:
+  port: 80
+  version: 2
+spi:
   clk_pin: GPIO6
   mosi_pin: GPIO7
   miso_pin: GPIO2
 
+ethernet:
+  type: W5500
   cs_pin: GPIO10
   interrupt_pin: GPIO4
   reset_pin: GPIO5
 
-  domain: .lan
-
 web_server:
   port: 80
-
-text_sensor:
-  - platform: ethernet_info
-    ip_address:
-      name: Ethernet IP
-    dns_address:
-      name: Ethernet DNS
-    mac_address:
-      name: Ethernet MAC
