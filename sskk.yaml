@@ -267,11 +267,15 @@ wifi:
 api:
   encryption:
     key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
+  reboot_timeout: 1h
 
+# OTA：同时支持 ① dashboard/CLI ② 网页上传
 ota:
   - platform: esphome
     password: "chen1122"
+  - platform: web_server
 
+# Web 控制台 + Web OTA（浏览器访问 http://192.168.6.82）
 web_server:
   port: 80
   version: 2
