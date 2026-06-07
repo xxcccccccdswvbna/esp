@@ -16,7 +16,6 @@ ethernet:
   cs_pin: GPIO21
   # reset_pin:          # 临时注释
   # interrupt_pin:      # 临时注释
-  clock_speed: 5MHz     # 极限降频
 
 logger:
   level: INFO
