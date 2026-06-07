@@ -12,9 +12,9 @@ ethernet:
   clk_pin: GPIO19
   mosi_pin: GPIO18
   miso_pin: GPIO20
-  cs_pin: GPIO21        # 尝试 CS=21
+  cs_pin: GPIO23        # 保持你原来的 CS
   interrupt_pin: GPIO22
-  reset_pin: GPIO23     # 尝试 RST=23
+  reset_pin: GPIO21     # 尝试 RST=21
   clock_speed: 10MHz
 api:
   encryption:
