@@ -12,9 +12,9 @@ ethernet:
   clk_pin: GPIO19
   mosi_pin: GPIO18
   miso_pin: GPIO20
-  cs_pin: GPIO23
+  cs_pin: GPIO21        # ⚠️ 修改：从 23 改为 21
   interrupt_pin: GPIO22
-  reset_pin: GPIO21
+  reset_pin: GPIO23     # ⚠️ 新增：使用 GPIO23 控制复位
   clock_speed: 10MHz   # ✅ 修正拼写
 api:
   encryption:
