@@ -1,14 +1,21 @@
 esphome:
-  name: esp32c6-eth
+  name: c6-eth-gateway
+  friendly_name: "C6 Ethernet Gateway"
 
 esp32:
-  board: esp32-c6-devkitm-1
+  board: esp32-c6-devkitc-1
   framework:
     type: esp-idf
 
-logger:
-  level: VERY_VERBOSE
-
+ethernet:
+  type: W5500
+  clk_pin: GPIO19
+  mosi_pin: GPIO18
+  miso_pin: GPIO20
+  cs_pin: GPIO23
+  interrupt_pin: GPIO22
+  reset_pin: GPIO5      # ← 请根据实测替换
+  clk_speed: 10MHz
 
 api:
   encryption:
@@ -22,13 +29,14 @@ web_server:
   port: 80
   version: 2
 
-ethernet:
-  type: W5500
+logger:
+  level: INFO  # 恢复默认，避免日志阻塞网络栈
 
-  clk_pin: GPIO19
-  mosi_pin: GPIO18
-  miso_pin: GPIO20
-  cs_pin: GPIO23
+binary_sensor:
+  - platform: status
+    name: "Ethernet Status"
 
-  interrupt_pin: GPIO22
-
+text_sensor:
+  - platform: ethernet_info
+    ip_address:
+      name: "Ethernet IP"
