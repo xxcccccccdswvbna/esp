@@ -9,13 +9,13 @@ esp32:
 
 ethernet:
   type: W5500
-  clk_pin: GPIO19       # SCK
-  mosi_pin: GPIO18      # MOSI
-  miso_pin: GPIO20      # MISO
-  cs_pin: GPIO21        # ⚠️ 关键修正：从 23 改为 21
-  interrupt_pin: GPIO22 # INT
-  reset_pin: GPIO5      # ⚠️ 关键新增：W5500 必须复位，通常为 GPIO5
-  clock_speed: 10MHz    # ⚠️ 关键新增：降低 SPI 速率，防通信失败
+  clk_pin: GPIO19
+  mosi_pin: GPIO18
+  miso_pin: GPIO20
+  cs_pin: GPIO21        # 尝试 CS=21
+  interrupt_pin: GPIO22
+  reset_pin: GPIO23     # 尝试 RST=23
+  clock_speed: 10MHz
 api:
   encryption:
     key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
