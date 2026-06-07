@@ -12,11 +12,10 @@ ethernet:
   clk_pin: GPIO19
   mosi_pin: GPIO18
   miso_pin: GPIO20
-  cs_pin: GPIO23
+  cs_pin: GPIO21        # ⚠️ 修改：从 23 改为 21
   interrupt_pin: GPIO22
-  reset_pin: GPIO5      # ← 请根据实测替换
-  clk_speed: 10MHz
-
+  reset_pin: GPIO23     # ⚠️ 新增：使用 GPIO23 控制复位
+  clk_speed: 10MHz      # ⚠️ 新增：降低 SPI 速率，提高稳定性
 api:
   encryption:
     key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
