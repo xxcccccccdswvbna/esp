@@ -64,7 +64,7 @@ binary_sensor:
 switch:
   - platform: gpio
     id: relay
-    name: "Relay"
+    name: "插座开关"
 
     pin: GPIO15
 
@@ -84,7 +84,7 @@ switch:
 
   - platform: gpio
     id: wifi_led
-    name: "WiFi LED"
+    name: "WiFi状态灯"
 
     pin:
       number: GPIO13
@@ -94,7 +94,7 @@ switch:
 
   - platform: template
     id: timer_enable
-    name: "Timer Enable"
+    name: "定时启用"
 
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
@@ -102,7 +102,7 @@ switch:
 number:
   - platform: template
     id: start_hour
-    name: "Start Hour"
+    name: "开始小时1"
 
     min_value: 0
     max_value: 23
@@ -115,7 +115,7 @@ number:
 
   - platform: template
     id: start_minute
-    name: "Start Minute"
+    name: "开始分钟2"
 
     min_value: 0
     max_value: 59
@@ -128,7 +128,7 @@ number:
 
   - platform: template
     id: end_hour
-    name: "End Hour"
+    name: "结束小时3"
 
     min_value: 0
     max_value: 23
@@ -141,7 +141,7 @@ number:
 
   - platform: template
     id: end_minute
-    name: "End Minute"
+    name: "结束分钟4"
 
     min_value: 0
     max_value: 59
@@ -155,14 +155,14 @@ number:
 sensor:
   - platform: wifi_signal
     id: wifi_db
-    name: "WiFi Signal dBm"
+    name: "WiFi信号"
 
     unit_of_measurement: "dBm"
     update_interval: 60s
 
   - platform: copy
     source_id: wifi_db
-    name: "WiFi Quality"
+    name: "WiFi质量"
 
     unit_of_measurement: "%"
     accuracy_decimals: 0
@@ -175,10 +175,10 @@ sensor:
 
   - platform: uptime
     id: uptime_sensor
-    name: "Uptime Seconds"
+    name: "运行秒数"
 
   - platform: template
-    name: "Free Heap"
+    name: "剩余内存"
 
     unit_of_measurement: "B"
     accuracy_decimals: 0
@@ -192,19 +192,19 @@ text_sensor:
   - platform: wifi_info
 
     ip_address:
-      name: "IP Address"
+      name: "IP地址"
 
     ssid:
-      name: "WiFi SSID"
+      name: "WiFi名称"
 
     mac_address:
-      name: "MAC Address"
+      name: "MAC地址"
 
   - platform: version
-    name: "ESPHome Version"
+    name: "ESPHome版本"
 
   - platform: template
-    name: "Uptime"
+    name: "运行时间"
 
     lambda: |-
       uint32_t s = (uint32_t) id(uptime_sensor).state;
@@ -268,4 +268,4 @@ script:
 
 button:
   - platform: restart
-    name: "Restart Device"
+    name: "重启设备"
