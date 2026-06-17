@@ -20,7 +20,6 @@ wifi:
   password: "chen1122"
 
   min_auth_mode: WPA2
-
   reboot_timeout: 0s
 
   ap:
@@ -32,6 +31,8 @@ captive_portal:
 web_server:
   port: 80
   version: 3
+
+copy:
 
 time:
   - platform: sntp
@@ -64,7 +65,7 @@ binary_sensor:
 switch:
   - platform: gpio
     id: relay
-    name: "插座开关"
+    name: "插座开关_Relay"
 
     pin: GPIO15
 
@@ -84,7 +85,7 @@ switch:
 
   - platform: gpio
     id: wifi_led
-    name: "WiFi状态灯"
+    name: "WiFi状态灯_WiFiLED"
 
     pin:
       number: GPIO13
@@ -94,15 +95,13 @@ switch:
 
   - platform: template
     id: timer_enable
-    name: "定时启用"
-
+    name: "定时启用_Timer"
     optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
 
 number:
   - platform: template
     id: start_hour
-    name: "开始小时1"
+    name: "开始小时_StartHour"
 
     min_value: 0
     max_value: 23
@@ -110,12 +109,11 @@ number:
 
     optimistic: true
     restore_value: true
-
     initial_value: 23
 
   - platform: template
     id: start_minute
-    name: "开始分钟2"
+    name: "开始分钟_StartMinute"
 
     min_value: 0
     max_value: 59
@@ -123,12 +121,11 @@ number:
 
     optimistic: true
     restore_value: true
-
     initial_value: 0
 
   - platform: template
     id: end_hour
-    name: "结束小时3"
+    name: "结束小时_EndHour"
 
     min_value: 0
     max_value: 23
@@ -136,12 +133,11 @@ number:
 
     optimistic: true
     restore_value: true
-
     initial_value: 7
 
   - platform: template
     id: end_minute
-    name: "结束分钟4"
+    name: "结束分钟_EndMinute"
 
     min_value: 0
     max_value: 59
@@ -149,20 +145,19 @@ number:
 
     optimistic: true
     restore_value: true
-
     initial_value: 0
 
 sensor:
   - platform: wifi_signal
     id: wifi_db
-    name: "WiFi信号"
+    name: "WiFi信号_WiFiSignal"
 
     unit_of_measurement: "dBm"
     update_interval: 60s
 
   - platform: copy
     source_id: wifi_db
-    name: "WiFi质量"
+    name: "WiFi质量_WiFiQuality"
 
     unit_of_measurement: "%"
     accuracy_decimals: 0
@@ -175,16 +170,16 @@ sensor:
 
   - platform: uptime
     id: uptime_sensor
-    name: "运行秒数"
+    name: "运行秒数_UptimeSeconds"
 
   - platform: template
-    name: "剩余内存"
+    name: "剩余内存_FreeHeap"
 
     unit_of_measurement: "B"
     accuracy_decimals: 0
 
     lambda: |-
-      return (float) ESP.getFreeHeap();
+      return ESP.getFreeHeap();
 
     update_interval: 60s
 
@@ -192,19 +187,19 @@ text_sensor:
   - platform: wifi_info
 
     ip_address:
-      name: "IP地址"
+      name: "IP地址_IP"
 
     ssid:
-      name: "WiFi名称"
+      name: "WiFi名称_SSID"
 
     mac_address:
-      name: "MAC地址"
+      name: "MAC地址_MAC"
 
   - platform: version
-    name: "ESPHome版本"
+    name: "ESPHome版本_Version"
 
   - platform: template
-    name: "运行时间"
+    name: "运行时间_Uptime"
 
     lambda: |-
       uint32_t s = (uint32_t) id(uptime_sensor).state;
@@ -234,9 +229,7 @@ script:
           if (!now.is_valid())
             return;
 
-          int cur =
-            now.hour * 60 +
-            now.minute;
+          int cur = now.hour * 60 + now.minute;
 
           int start =
             (int) id(start_hour).state * 60 +
@@ -249,13 +242,9 @@ script:
           bool should_on;
 
           if (start < end) {
-            should_on =
-              cur >= start &&
-              cur < end;
+            should_on = (cur >= start && cur < end);
           } else {
-            should_on =
-              cur >= start ||
-              cur < end;
+            should_on = (cur >= start || cur < end);
           }
 
           if (should_on) {
@@ -268,4 +257,4 @@ script:
 
 button:
   - platform: restart
-    name: "重启设备"
+    name: "重启设备_Restart"
