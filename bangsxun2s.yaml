@@ -46,6 +46,7 @@ time:
 
 binary_sensor:
   - platform: gpio
+    id: button_input
     internal: true
 
     pin:
