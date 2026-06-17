@@ -19,6 +19,8 @@ wifi:
   ssid: "CC"
   password: "chen1122"
 
+  min_auth_mode: WPA2
+
   reboot_timeout: 0s
 
   ap:
@@ -33,7 +35,7 @@ web_server:
 
 binary_sensor:
   - platform: gpio
-    name: "button"
+    name: "按钮"
     internal: true
 
     pin:
@@ -55,24 +57,24 @@ binary_sensor:
 switch:
   - platform: gpio
     id: relay
-    name: "kaiguan001"
+    name: "开关"
 
     pin: GPIO15
 
     on_turn_on:
-      - switch.turn_on: light
+      - switch.turn_on: led_relay
 
     on_turn_off:
-      - switch.turn_off: light
+      - switch.turn_off: led_relay
 
   - platform: gpio
-    id: light
+    id: led_relay
     internal: true
 
     pin: GPIO12
     inverted: true
 
-  # ESP8266 模块蓝色 WiFi 灯
+  # ESP8266蓝色LED（如果无效可删除）
   - platform: gpio
     id: wifi_led
     name: "WiFi状态灯"
@@ -89,14 +91,14 @@ status_led:
 sensor:
   - platform: wifi_signal
     id: wifi_db
-    name: "WiFi信号"
+    name: "WiFi信号_dBm"
     unit_of_measurement: "dBm"
     update_interval: 60s
     entity_category: diagnostic
 
   - platform: copy
     source_id: wifi_db
-    name: "WiFi质量"
+    name: "WiFi质量_pct"
     unit_of_measurement: "%"
     accuracy_decimals: 0
     entity_category: diagnostic
@@ -109,7 +111,7 @@ sensor:
 
   - platform: uptime
     id: uptime_sensor
-    name: "运行时间(秒)"
+    name: "运行时间秒"
     entity_category: diagnostic
 
   - platform: template
@@ -119,7 +121,7 @@ sensor:
     entity_category: diagnostic
 
     lambda: |-
-      return ESP.getFreeHeap();
+      return (float) ESP.getFreeHeap();
 
     update_interval: 60s
 
@@ -148,7 +150,6 @@ text_sensor:
 
   - platform: template
     name: "运行时间"
-    icon: mdi:clock-outline
     entity_category: diagnostic
 
     lambda: |-
