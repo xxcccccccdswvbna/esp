@@ -46,7 +46,6 @@ time:
 
 binary_sensor:
   - platform: gpio
-    name: "按钮"
     internal: true
 
     pin:
@@ -61,15 +60,10 @@ binary_sensor:
     on_press:
       - switch.toggle: relay
 
-  - platform: status
-    name: "在线状态"
-    entity_category: diagnostic
-
 switch:
-  # 继电器
   - platform: gpio
     id: relay
-    name: "开关"
+    name: "Relay"
 
     pin: GPIO15
 
@@ -79,7 +73,6 @@ switch:
     on_turn_off:
       - switch.turn_off: relay_led
 
-  # 继电器状态灯
   - platform: gpio
     id: relay_led
     internal: true
@@ -88,10 +81,9 @@ switch:
       number: GPIO12
       inverted: true
 
-  # WiFi状态灯
   - platform: gpio
     id: wifi_led
-    name: "WiFi状态灯"
+    name: "WiFi LED"
 
     pin:
       number: GPIO13
@@ -99,18 +91,17 @@ switch:
 
     restore_mode: RESTORE_DEFAULT_ON
 
-  # 定时功能总开关
   - platform: template
     id: timer_enable
-    name: "定时启用"
+    name: "Timer Enable"
 
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
 
 number:
   - platform: template
-    name: "开始小时"
     id: start_hour
+    name: "Start Hour"
 
     min_value: 0
     max_value: 23
@@ -122,8 +113,8 @@ number:
     initial_value: 23
 
   - platform: template
-    name: "开始分钟"
     id: start_minute
+    name: "Start Minute"
 
     min_value: 0
     max_value: 59
@@ -135,8 +126,8 @@ number:
     initial_value: 0
 
   - platform: template
-    name: "结束小时"
     id: end_hour
+    name: "End Hour"
 
     min_value: 0
     max_value: 23
@@ -148,8 +139,8 @@ number:
     initial_value: 7
 
   - platform: template
-    name: "结束分钟"
     id: end_minute
+    name: "End Minute"
 
     min_value: 0
     max_value: 59
@@ -163,21 +154,17 @@ number:
 sensor:
   - platform: wifi_signal
     id: wifi_db
-    name: "WiFi信号_dBm"
+    name: "WiFi Signal dBm"
 
     unit_of_measurement: "dBm"
     update_interval: 60s
 
-    entity_category: diagnostic
-
   - platform: copy
     source_id: wifi_db
-    name: "WiFi质量_pct"
+    name: "WiFi Quality"
 
     unit_of_measurement: "%"
     accuracy_decimals: 0
-
-    entity_category: diagnostic
 
     filters:
       - lambda: |-
@@ -187,17 +174,13 @@ sensor:
 
   - platform: uptime
     id: uptime_sensor
-    name: "运行时间秒"
-
-    entity_category: diagnostic
+    name: "Uptime Seconds"
 
   - platform: template
-    name: "剩余内存"
+    name: "Free Heap"
 
     unit_of_measurement: "B"
     accuracy_decimals: 0
-
-    entity_category: diagnostic
 
     lambda: |-
       return (float) ESP.getFreeHeap();
@@ -208,19 +191,19 @@ text_sensor:
   - platform: wifi_info
 
     ip_address:
-      name: "IP地址"
+      name: "IP Address"
 
     ssid:
-      name: "WiFi名称"
+      name: "WiFi SSID"
 
     mac_address:
-      name: "MAC地址"
+      name: "MAC Address"
 
   - platform: version
-    name: "ESPHome版本"
+    name: "ESPHome Version"
 
   - platform: template
-    name: "运行时间"
+    name: "Uptime"
 
     lambda: |-
       uint32_t s = (uint32_t) id(uptime_sensor).state;
@@ -284,4 +267,4 @@ script:
 
 button:
   - platform: restart
-    name: "重启设备"
+    name: "Restart Device"
