@@ -33,6 +33,17 @@ web_server:
   port: 80
   version: 3
 
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: Asia/Shanghai
+
+    on_time:
+      - seconds: 0
+        minutes: /1
+        then:
+          - script.execute: timer_control
+
 binary_sensor:
   - platform: gpio
     name: "按钮"
@@ -68,7 +79,7 @@ switch:
     on_turn_off:
       - switch.turn_off: relay_led
 
-  # 开关状态灯
+  # 继电器状态灯
   - platform: gpio
     id: relay_led
     internal: true
@@ -88,19 +99,84 @@ switch:
 
     restore_mode: RESTORE_DEFAULT_ON
 
+  # 定时功能总开关
+  - platform: template
+    id: timer_enable
+    name: "定时启用"
+
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+number:
+  - platform: template
+    name: "开始小时"
+    id: start_hour
+
+    min_value: 0
+    max_value: 23
+    step: 1
+
+    optimistic: true
+    restore_value: true
+
+    initial_value: 23
+
+  - platform: template
+    name: "开始分钟"
+    id: start_minute
+
+    min_value: 0
+    max_value: 59
+    step: 1
+
+    optimistic: true
+    restore_value: true
+
+    initial_value: 0
+
+  - platform: template
+    name: "结束小时"
+    id: end_hour
+
+    min_value: 0
+    max_value: 23
+    step: 1
+
+    optimistic: true
+    restore_value: true
+
+    initial_value: 7
+
+  - platform: template
+    name: "结束分钟"
+    id: end_minute
+
+    min_value: 0
+    max_value: 59
+    step: 1
+
+    optimistic: true
+    restore_value: true
+
+    initial_value: 0
+
 sensor:
   - platform: wifi_signal
     id: wifi_db
     name: "WiFi信号_dBm"
+
     unit_of_measurement: "dBm"
     update_interval: 60s
+
     entity_category: diagnostic
 
   - platform: copy
     source_id: wifi_db
     name: "WiFi质量_pct"
+
     unit_of_measurement: "%"
     accuracy_decimals: 0
+
     entity_category: diagnostic
 
     filters:
@@ -112,12 +188,15 @@ sensor:
   - platform: uptime
     id: uptime_sensor
     name: "运行时间秒"
+
     entity_category: diagnostic
 
   - platform: template
     name: "剩余内存"
+
     unit_of_measurement: "B"
     accuracy_decimals: 0
+
     entity_category: diagnostic
 
     lambda: |-
@@ -130,23 +209,18 @@ text_sensor:
 
     ip_address:
       name: "IP地址"
-      entity_category: diagnostic
 
     ssid:
       name: "WiFi名称"
-      entity_category: diagnostic
 
     mac_address:
       name: "MAC地址"
-      entity_category: diagnostic
 
   - platform: version
     name: "ESPHome版本"
-    entity_category: diagnostic
 
   - platform: template
     name: "运行时间"
-    entity_category: diagnostic
 
     lambda: |-
       uint32_t s = (uint32_t) id(uptime_sensor).state;
@@ -162,7 +236,52 @@ text_sensor:
 
     update_interval: 60s
 
+script:
+  - id: timer_control
+    mode: restart
+
+    then:
+      - lambda: |-
+          if (!id(timer_enable).state)
+            return;
+
+          auto now = id(sntp_time).now();
+
+          if (!now.is_valid())
+            return;
+
+          int cur =
+            now.hour * 60 +
+            now.minute;
+
+          int start =
+            (int) id(start_hour).state * 60 +
+            (int) id(start_minute).state;
+
+          int end =
+            (int) id(end_hour).state * 60 +
+            (int) id(end_minute).state;
+
+          bool should_on;
+
+          if (start < end) {
+            should_on =
+              cur >= start &&
+              cur < end;
+          } else {
+            should_on =
+              cur >= start ||
+              cur < end;
+          }
+
+          if (should_on) {
+            if (!id(relay).state)
+              id(relay).turn_on();
+          } else {
+            if (id(relay).state)
+              id(relay).turn_off();
+          }
+
 button:
   - platform: restart
     name: "重启设备"
-    entity_category: diagnostic
