@@ -157,19 +157,15 @@ number:
 sensor:
   - platform: wifi_signal
     id: wifi_db
-    name: "WiFi信号"
-
-    update_interval: 60s
+    name: WiFi信号_WiFiSignal
 
   - platform: template
-    name: "WiFi质量"
-
+    name: WiFi质量_WiFiQuality
     lambda: |-
       float x = id(wifi_db).state;
       if (x <= -100) return 0;
       if (x >= -50) return 100;
       return 2 * (x + 100);
-
     unit_of_measurement: "%"
 
   - platform: template
