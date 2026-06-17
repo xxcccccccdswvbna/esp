@@ -32,7 +32,6 @@ web_server:
   port: 80
   version: 3
 
-
 time:
   - platform: sntp
     id: sntp_time
@@ -61,10 +60,29 @@ binary_sensor:
     on_press:
       - switch.toggle: relay
 
+globals:
+  - id: off_timer
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (id(off_timer) > 0) {
+            id(off_timer) -= 1;
+
+            if (id(off_timer) <= 0) {
+              id(off_timer) = 0;
+              id(relay).turn_off();
+            }
+          }
+
 switch:
   - platform: gpio
     id: relay
-    name: "插座开关_Relay"
+    name: "插座开关"
 
     pin: GPIO15
 
@@ -84,7 +102,7 @@ switch:
 
   - platform: gpio
     id: wifi_led
-    name: "WiFi状态灯_WiFiLED"
+    name: "WiFi状态灯"
 
     pin:
       number: GPIO13
@@ -94,8 +112,10 @@ switch:
 
   - platform: template
     id: timer_enable
-    name: "定时启用_Timer"
+    name: "定时启用"
+
     optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
 
 number:
   - platform: template
@@ -105,10 +125,7 @@ number:
     min_value: 0
     max_value: 23
     step: 1
-
-    optimistic: true
     restore_value: true
-    initial_value: 23
 
   - platform: template
     id: start_minute
@@ -117,10 +134,7 @@ number:
     min_value: 0
     max_value: 59
     step: 1
-
-    optimistic: true
     restore_value: true
-    initial_value: 0
 
   - platform: template
     id: end_hour
@@ -129,10 +143,7 @@ number:
     min_value: 0
     max_value: 23
     step: 1
-
-    optimistic: true
     restore_value: true
-    initial_value: 7
 
   - platform: template
     id: end_minute
@@ -141,112 +152,70 @@ number:
     min_value: 0
     max_value: 59
     step: 1
-
-    optimistic: true
     restore_value: true
-    initial_value: 0
 
 sensor:
   - platform: wifi_signal
     id: wifi_db
-    name: "WiFi信号_WiFiSignal"
+    name: "WiFi信号"
 
-    unit_of_measurement: "dBm"
     update_interval: 60s
 
-  - platform: copy
-    source_id: wifi_db
-    name: "WiFi质量_WiFiQuality"
+  - platform: template
+    name: "WiFi质量"
+
+    lambda: |-
+      float x = id(wifi_db).state;
+      if (x <= -100) return 0;
+      if (x >= -50) return 100;
+      return 2 * (x + 100);
 
     unit_of_measurement: "%"
-    accuracy_decimals: 0
-
-    filters:
-      - lambda: |-
-          if (x <= -100) return 0;
-          if (x >= -50) return 100;
-          return 2 * (x + 100);
-
-  - platform: uptime
-    id: uptime_sensor
-    name: "运行秒数_UptimeSeconds"
 
   - platform: template
-    name: "剩余内存_FreeHeap"
+    name: "剩余倒计时(秒)"
 
-    unit_of_measurement: "B"
-    accuracy_decimals: 0
+    lambda: |-
+      return id(off_timer);
+
+    update_interval: 1s
+
+  - platform: template
+    name: "剩余内存"
 
     lambda: |-
       return ESP.getFreeHeap();
 
     update_interval: 60s
 
-text_sensor:
-  - platform: wifi_info
-
-    ip_address:
-      name: "IP地址_IP"
-
-    ssid:
-      name: "WiFi名称_SSID"
-
-    mac_address:
-      name: "MAC地址_MAC"
-
-  - platform: version
-    name: "ESPHome版本_Version"
-
-  - platform: template
-    name: "运行时间_Uptime"
-
-    lambda: |-
-      uint32_t s = (uint32_t) id(uptime_sensor).state;
-
-      uint32_t d = s / 86400;
-      uint32_t h = (s % 86400) / 3600;
-      uint32_t m = (s % 3600) / 60;
-
-      char buf[32];
-      sprintf(buf, "%ud %uh %um", d, h, m);
-
-      return std::string(buf);
-
-    update_interval: 60s
-
 script:
   - id: timer_control
     mode: restart
-
     then:
       - lambda: |-
+          if (id(off_timer) > 0)
+            return;
+
           if (!id(timer_enable).state)
             return;
 
           auto now = id(sntp_time).now();
-
           if (!now.is_valid())
             return;
 
           int cur = now.hour * 60 + now.minute;
 
-          int start =
-            (int) id(start_hour).state * 60 +
-            (int) id(start_minute).state;
+          int start = (int)id(start_hour).state * 60 + (int)id(start_minute).state;
+          int end = (int)id(end_hour).state * 60 + (int)id(end_minute).state;
 
-          int end =
-            (int) id(end_hour).state * 60 +
-            (int) id(end_minute).state;
+          bool on;
 
-          bool should_on;
+          if (start < end)
+            on = cur >= start && cur < end;
+          else
+            on = cur >= start || cur < end;
 
-          if (start < end) {
-            should_on = (cur >= start && cur < end);
-          } else {
-            should_on = (cur >= start || cur < end);
-          }
-
-          if (should_on) {
+          if (on) {
             if (!id(relay).state)
               id(relay).turn_on();
           } else {
@@ -256,4 +225,34 @@ script:
 
 button:
   - platform: restart
-    name: "重启设备_Restart"
+    name: "重启设备"
+
+  - platform: template
+    name: "30分钟关闭"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 30 * 60;
+
+  - platform: template
+    name: "1小时关闭"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 60 * 60;
+
+  - platform: template
+    name: "2小时关闭"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 120 * 60;
+
+  - platform: template
+    name: "4小时关闭"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 240 * 60;
+
+  - platform: template
+    name: "取消倒计时"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 0;
