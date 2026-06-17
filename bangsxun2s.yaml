@@ -120,39 +120,39 @@ switch:
 number:
   - platform: template
     id: start_hour
-    name: "开始小时_StartHour"
-
+    name: 开始小时_StartHour
     min_value: 0
     max_value: 23
     step: 1
     restore_value: true
+    optimistic: true
 
   - platform: template
     id: start_minute
-    name: "开始分钟_StartMinute"
-
+    name: 开始分钟_StartMinute
     min_value: 0
     max_value: 59
     step: 1
     restore_value: true
+    optimistic: true
 
   - platform: template
     id: end_hour
-    name: "结束小时_EndHour"
-
+    name: 结束小时_EndHour
     min_value: 0
     max_value: 23
     step: 1
     restore_value: true
+    optimistic: true
 
   - platform: template
     id: end_minute
-    name: "结束分钟_EndMinute"
-
+    name: 结束分钟_EndMinute
     min_value: 0
     max_value: 59
     step: 1
     restore_value: true
+    optimistic: true
 
 sensor:
   - platform: wifi_signal
