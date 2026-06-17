@@ -1,0 +1,171 @@
+esphome:
+  name: ee
+  friendly_name: EE
+
+esp8266:
+  board: esp01_1m
+  restore_from_flash: true
+
+logger:
+  baud_rate: 0
+
+api:
+
+ota:
+  - platform: esphome
+    password: "chen1122"
+
+wifi:
+  ssid: "CC"
+  password: "chen1122"
+
+  reboot_timeout: 0s
+
+  ap:
+    ssid: "EE-Setup"
+    password: "12345678"
+
+captive_portal:
+
+web_server:
+  port: 80
+  version: 3
+
+binary_sensor:
+  - platform: gpio
+    name: "button"
+    internal: true
+
+    pin:
+      number: GPIO14
+      mode: INPUT_PULLUP
+
+    filters:
+      - invert:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+
+    on_press:
+      - switch.toggle: relay
+
+  - platform: status
+    name: "在线状态"
+    entity_category: diagnostic
+
+switch:
+  - platform: gpio
+    id: relay
+    name: "kaiguan001"
+
+    pin: GPIO15
+
+    on_turn_on:
+      - switch.turn_on: light
+
+    on_turn_off:
+      - switch.turn_off: light
+
+  - platform: gpio
+    id: light
+    internal: true
+
+    pin: GPIO12
+    inverted: true
+
+  # ESP8266 模块蓝色 WiFi 灯
+  - platform: gpio
+    id: wifi_led
+    name: "WiFi状态灯"
+
+    pin:
+      number: GPIO2
+      inverted: true
+
+    restore_mode: RESTORE_DEFAULT_OFF
+
+status_led:
+  pin: GPIO13
+
+sensor:
+  - platform: wifi_signal
+    id: wifi_db
+    name: "WiFi信号"
+    unit_of_measurement: "dBm"
+    update_interval: 60s
+    entity_category: diagnostic
+
+  - platform: copy
+    source_id: wifi_db
+    name: "WiFi质量"
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    entity_category: diagnostic
+
+    filters:
+      - lambda: |-
+          if (x <= -100) return 0;
+          if (x >= -50) return 100;
+          return 2 * (x + 100);
+
+  - platform: uptime
+    id: uptime_sensor
+    name: "运行时间(秒)"
+    entity_category: diagnostic
+
+  - platform: template
+    name: "剩余内存"
+    unit_of_measurement: "B"
+    accuracy_decimals: 0
+    entity_category: diagnostic
+
+    lambda: |-
+      return ESP.getFreeHeap();
+
+    update_interval: 60s
+
+text_sensor:
+  - platform: wifi_info
+
+    ip_address:
+      name: "IP地址"
+      entity_category: diagnostic
+
+    ssid:
+      name: "WiFi名称"
+      entity_category: diagnostic
+
+    bssid:
+      name: "路由器BSSID"
+      entity_category: diagnostic
+
+    mac_address:
+      name: "MAC地址"
+      entity_category: diagnostic
+
+  - platform: version
+    name: "ESPHome版本"
+    entity_category: diagnostic
+
+  - platform: template
+    name: "运行时间"
+    icon: mdi:clock-outline
+    entity_category: diagnostic
+
+    lambda: |-
+      uint32_t s = (uint32_t) id(uptime_sensor).state;
+
+      uint32_t d = s / 86400;
+      uint32_t h = (s % 86400) / 3600;
+      uint32_t m = (s % 3600) / 60;
+
+      char buf[32];
+      sprintf(buf, "%ud %uh %um", d, h, m);
+
+      return std::string(buf);
+
+    update_interval: 60s
+
+button:
+  - platform: restart
+    name: "重启设备"
+    entity_category: diagnostic
