@@ -18,10 +18,8 @@ ota:
 wifi:
   ssid: "CC"
   password: "chen1122"
-
   min_auth_mode: WPA2
   reboot_timeout: 0s
-
   ap:
     ssid: "EE-Setup"
     password: "12345678"
@@ -36,7 +34,6 @@ time:
   - platform: sntp
     id: sntp_time
     timezone: Asia/Shanghai
-
     on_time:
       - seconds: 0
         minutes: /1
@@ -47,16 +44,13 @@ binary_sensor:
   - platform: gpio
     id: button_input
     internal: true
-
     pin:
       number: GPIO14
       mode: INPUT_PULLUP
-
     filters:
-      - invert:
+      - invert
       - delayed_on: 50ms
       - delayed_off: 50ms
-
     on_press:
       - switch.toggle: relay
 
@@ -72,7 +66,6 @@ interval:
       - lambda: |-
           if (id(off_timer) > 0) {
             id(off_timer) -= 1;
-
             if (id(off_timer) <= 0) {
               id(off_timer) = 0;
               id(relay).turn_off();
@@ -83,19 +76,15 @@ switch:
   - platform: gpio
     id: relay
     name: "插座开关"
-
     pin: GPIO15
-
     on_turn_on:
       - switch.turn_on: relay_led
-
     on_turn_off:
       - switch.turn_off: relay_led
 
   - platform: gpio
     id: relay_led
     internal: true
-
     pin:
       number: GPIO12
       inverted: true
@@ -103,25 +92,21 @@ switch:
   - platform: gpio
     id: wifi_led
     name: "WiFi状态灯"
-
     pin:
       number: GPIO13
       inverted: true
-
     restore_mode: RESTORE_DEFAULT_ON
 
   - platform: template
     id: timer_enable
-    name: "定时启用"
-
+    name: "定时器启用"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
 
 number:
   - platform: template
     id: start_hour
-    name: "开始小时_StartHour"
-
+    name: "开始小时"
     min_value: 0
     max_value: 23
     step: 1
@@ -129,8 +114,7 @@ number:
 
   - platform: template
     id: start_minute
-    name: "开始分钟_StartMinute"
-
+    name: "开始分钟"
     min_value: 0
     max_value: 59
     step: 1
@@ -138,8 +122,7 @@ number:
 
   - platform: template
     id: end_hour
-    name: "结束小时_EndHour"
-
+    name: "结束小时"
     min_value: 0
     max_value: 23
     step: 1
@@ -147,8 +130,7 @@ number:
 
   - platform: template
     id: end_minute
-    name: "结束分钟_EndMinute"
-
+    name: "结束分钟"
     min_value: 0
     max_value: 59
     step: 1
@@ -158,70 +140,47 @@ sensor:
   - platform: wifi_signal
     id: wifi_db
     name: "WiFi信号"
-
     update_interval: 60s
 
   - platform: template
     name: "WiFi质量"
-
     lambda: |-
       float x = id(wifi_db).state;
       if (x <= -100) return 0;
       if (x >= -50) return 100;
       return 2 * (x + 100);
-
     unit_of_measurement: "%"
 
   - platform: template
-    name: "剩余倒计时(秒)"
-
-    lambda: |-
-      return id(off_timer);
-
+    name: "剩余倒计时"
+    lambda: return id(off_timer);
     update_interval: 1s
+    unit_of_measurement: "s"
 
   - platform: template
     name: "剩余内存"
-
-    lambda: |-
-      return ESP.getFreeHeap();
-
+    lambda: return ESP.getFreeHeap();
     update_interval: 60s
+    unit_of_measurement: "B"
 
 script:
   - id: timer_control
     mode: restart
     then:
       - lambda: |-
-          if (id(off_timer) > 0)
-            return;
-
-          if (!id(timer_enable).state)
-            return;
+          if (id(off_timer) > 0) return;
+          if (!id(timer_enable).state) return;
 
           auto now = id(sntp_time).now();
-          if (!now.is_valid())
-            return;
+          if (!now.is_valid()) return;
 
           int cur = now.hour * 60 + now.minute;
-
           int start = (int)id(start_hour).state * 60 + (int)id(start_minute).state;
           int end = (int)id(end_hour).state * 60 + (int)id(end_minute).state;
+          bool on = (start < end) ? (cur >= start && cur < end) : (cur >= start || cur < end);
 
-          bool on;
-
-          if (start < end)
-            on = cur >= start && cur < end;
-          else
-            on = cur >= start || cur < end;
-
-          if (on) {
-            if (!id(relay).state)
-              id(relay).turn_on();
-          } else {
-            if (id(relay).state)
-              id(relay).turn_off();
-          }
+          if (on && !id(relay).state) id(relay).turn_on();
+          if (!on && id(relay).state) id(relay).turn_off();
 
 button:
   - platform: restart
@@ -230,29 +189,24 @@ button:
   - platform: template
     name: "30分钟关闭"
     on_press:
-      - lambda: |-
-          id(off_timer) = 30 * 60;
+      - lambda: id(off_timer) = 1800;
 
   - platform: template
     name: "1小时关闭"
     on_press:
-      - lambda: |-
-          id(off_timer) = 60 * 60;
+      - lambda: id(off_timer) = 3600;
 
   - platform: template
     name: "2小时关闭"
     on_press:
-      - lambda: |-
-          id(off_timer) = 120 * 60;
+      - lambda: id(off_timer) = 7200;
 
   - platform: template
     name: "4小时关闭"
     on_press:
-      - lambda: |-
-          id(off_timer) = 240 * 60;
+      - lambda: id(off_timer) = 14400;
 
   - platform: template
     name: "取消倒计时"
     on_press:
-      - lambda: |-
-          id(off_timer) = 0;
+      - lambda: id(off_timer) = 0;
