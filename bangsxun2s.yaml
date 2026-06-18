@@ -37,12 +37,12 @@ mqtt:
   username: "97109945d7e24559b3e4ca7a1f8ef160"
   password: "97109945d7e24559b3e4ca7a1f8ef160"
   discovery: false
-  topic_prefix: ""
+  topic_prefix: "bemfa"  # 修改：不能为空，必须设置为 bemfa
   id: mqtt_client
 
   # 【核心】监听巴法云下发的控制指令
   on_message:
-    - topic: bangxun001
+    - topic: bemfa/bangxun001  # 修改：加上 bemfa/ 前缀
       then:
         - lambda: |-
             if (x == "on") {
@@ -114,14 +114,14 @@ switch:
     on_turn_on:
       - switch.turn_on: relay_led
       - mqtt.publish:
-          topic: bangxun001
+          topic: bemfa/bangxun001  # 修改：加上 bemfa/ 前缀
           payload: "on"
 
     # 当继电器关闭时，同步状态到巴法云
     on_turn_off:
       - switch.turn_off: relay_led
       - mqtt.publish:
-          topic: bangxun001
+          topic: bemfa/bangxun001  # 修改：加上 bemfa/ 前缀
           payload: "off"
 
   - platform: gpio
