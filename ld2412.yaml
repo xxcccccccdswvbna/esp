@@ -32,8 +32,8 @@ substitutions:
   relay_b_pin: GPIO25
   
   # 🌟 根据原理图修正：IO18是TX，IO19是RX
-  ld2412_tx_pin: GPIO18  
-  ld2412_rx_pin: GPIO19  
+  ld2412_tx_pin: GPIO19  
+  ld2412_rx_pin: GPIO18  
   
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
