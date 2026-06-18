@@ -4,7 +4,7 @@ esphome:
   comment: 基于ESP32的墙壁智能插座，磁保持继电器+计量+LD2412人体存在。支持OTA与本地网页控制。
   project:
     name: "HA-DIYer.SmarOutlet-V1"
-    version: "1.0.4"
+    version: "1.0.5"
 
 esp32:
   board: esp32dev
@@ -14,10 +14,10 @@ esp32:
 logger:
 api:
 
-# 🌟 启用本地网页服务器（满足您的网页功能需求）
+# 启用本地网页服务器
 web_server:
   port: 80
-  version: 2  # 使用新版网页界面，移动端体验更好
+  version: 2
 
 wifi:
   ap:
@@ -32,11 +32,9 @@ substitutions:
   relay_a_pin: GPIO26
   relay_b_pin: GPIO25
   
-  # 🛠️ LD2412 雷达引脚（软件修正接反问题）
-  # 原理：ESP32的GPIO18接了雷达的TX，所以GPIO18实际上是接收端(rx)；
-  #       ESP32的GPIO19接了雷达的RX，所以GPIO19实际上是发送端(tx)。
-  ld2412_tx_pin: GPIO19  # 作为发送端，接雷达的RX
-  ld2412_rx_pin: GPIO18  # 作为接收端，接雷达的TX
+  # LD2412 雷达引脚（软件修正接反问题）
+  ld2412_tx_pin: GPIO19  
+  ld2412_rx_pin: GPIO18  
   
   # BL0940 计量芯片引脚
   bl0940_tx_pin: GPIO21
@@ -48,20 +46,17 @@ globals:
      restore_value: yes
      initial_value: "0"
 
-# 两个独立的 UART 串口，互不干扰
 uart:
-  # BL0940 计量芯片 UART
   - id: uart_bl0940
     tx_pin: $bl0940_tx_pin
     rx_pin: $bl0940_rx_pin
     baud_rate: 4800
     stop_bits: 1
     
-  # LD2412 雷达 UART
   - id: uart_ld2412
     tx_pin: $ld2412_tx_pin
     rx_pin: $ld2412_rx_pin
-    baud_rate: 115200    # 🛠️ 修正：LD2412 的默认波特率是 115200
+    baud_rate: 256000    # LD2412 默认波特率
     parity: NONE
     stop_bits: 1
 
@@ -103,12 +98,13 @@ switch:
     name: "Restart"
     id: outlet_reset
 
-  # LD2412 工程模式与蓝牙开关
   - platform: ld2412
     engineering_mode:
-      name: "LD2412 Engineering Mode"
+      name: "LD2412 工程模式"
+      id: ld2412_eng_mode
     bluetooth:
-      name: "LD2412 Bluetooth"
+      name: "LD2412 蓝牙控制"
+      id: ld2412_bluetooth
 
 binary_sensor:
   - platform: gpio
@@ -140,14 +136,17 @@ binary_sensor:
               format: "FACTORY RESET"
           - button.press: btn_factory_reset
 
-  # LD2412 存在状态传感器
+  # 🌟 修复：为所有中文名称添加唯一的英文 id
   - platform: ld2412
     has_target:
       name: "LD2412 有人"
+      id: ld2412_target
     has_moving_target:
       name: "LD2412 微动"
+      id: ld2412_moving
     has_still_target:
       name: "LD2412 静止"
+      id: ld2412_still
 
 status_led:
   pin:
@@ -155,7 +154,6 @@ status_led:
     inverted: true
 
 sensor:
-  # BL0940 计量
   - platform: bl0940
     uart_id: uart_bl0940
     voltage:
@@ -177,7 +175,6 @@ sensor:
     resistor_two: 1950
     update_interval: 1s
 
-  # 当日用电量计算
   - platform: template
     name: "Total Daily Energy"
     id: bl0940_DailyEnergy
@@ -191,22 +188,27 @@ sensor:
       }
       return id(bl0940_energy).state - id(var_energy);
 
-  # LD2412 距离与能量传感器
+  # 🌟 修复：为所有中文名称添加唯一的英文 id
   - platform: ld2412
     moving_distance:
       name: "LD2412 运动距离"
+      id: ld2412_moving_dist
     still_distance:
       name: "LD2412 静止距离"
+      id: ld2412_still_dist
     moving_energy:
       name: "LD2412 运动能量"
+      id: ld2412_moving_energy
     still_energy:
       name: "LD2412 静止能量"
+      id: ld2412_still_energy
     detection_distance:
       name: "LD2412 检测距离"
+      id: ld2412_det_dist
     light:
       name: "LD2412 光照度"
+      id: ld2412_light
 
-# LD2412 顶层组件声明
 ld2412:
   uart_id: uart_ld2412
 
@@ -217,12 +219,20 @@ number:
     power_calibration: { name: Power Calibration }
     energy_calibration: { name: Energy Calibration }
 
-  # LD2412 阈值与超时设置
+  # 🌟 修复：为所有中文名称添加唯一的英文 id
   - platform: ld2412
-    timeout: { name: "LD2412 存在超时" }
-    min_distance_gate: { name: "LD2412 最小距离门" }
-    max_distance_gate: { name: "LD2412 最大距离门" }
-    light_threshold: { name: "LD2412 光照阈值" }
+    timeout: 
+      name: "LD2412 存在超时"
+      id: ld2412_timeout
+    min_distance_gate: 
+      name: "LD2412 最小距离门"
+      id: ld2412_min_gate
+    max_distance_gate: 
+      name: "LD2412 最大距离门"
+      id: ld2412_max_gate
+    light_threshold: 
+      name: "LD2412 光照阈值"
+      id: ld2412_light_thresh
 
 time:
   - platform: homeassistant
@@ -234,15 +244,6 @@ time:
         then:
           - lambda: id(var_energy) = id(bl0940_energy).state;
 
-# 注意：GPIO18 和 GPIO19 已被 LD2412 占用，红外/射频发射功能已物理失效，故保持注释。
-# remote_transmitter:
-#   - id: ir_remote_transmitter_id
-#     pin: GPIO18
-#     carrier_duty_percent: 50%
-#   - id: rf_remote_transmitter_id
-#     pin: GPIO19
-#     carrier_duty_percent: 100%
-
 button:
   - platform: bl0940
     name: Reset Calibration
@@ -251,14 +252,24 @@ button:
     internal: True
     id: btn_factory_reset
     
-  # LD2412 控制按钮
+  # 🌟 修复：为所有中文名称添加唯一的英文 id
   - platform: ld2412
-    factory_reset: { name: "LD2412 恢复出厂" }
-    restart: { name: "LD2412 重启雷达" }
-    query_params: { name: "LD2412 查询参数" }
+    factory_reset: 
+      name: "LD2412 恢复出厂"
+      id: ld2412_factory_reset
+    restart: 
+      name: "LD2412 重启雷达"
+      id: ld2412_restart
+    query_params: 
+      name: "LD2412 查询参数"
+      id: ld2412_query
 
 text_sensor:
-  # LD2412 固件版本与MAC地址
+  # 🌟 修复：为所有中文名称添加唯一的英文 id
   - platform: ld2412
-    version: { name: "LD2412 固件版本" }
-    mac_address: { name: "LD2412 MAC地址" }
+    version: 
+      name: "LD2412 固件版本"
+      id: ld2412_version
+    mac_address: 
+      name: "LD2412 MAC地址"
+      id: ld2412_mac
