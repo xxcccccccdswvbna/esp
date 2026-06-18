@@ -29,19 +29,20 @@ wifi:
 captive_portal:
 
 # ==========================================
-# 【巴法云 MQTT 配置】
+# 【巴法云 MQTT 配置 - 最终正确版】
 # ==========================================
 mqtt:
   broker: bemfa.com
-  port: 9501
+  port: 9501  # 巴法云标准 MQTT 端口
   username: "97109945d7e24559b3e4ca7a1f8ef160"
   password: "97109945d7e24559b3e4ca7a1f8ef160"
   discovery: false
+  # topic_prefix 已移除，保持为空
   id: mqtt_client
 
   # 【核心】监听巴法云下发的控制指令
   on_message:
-    - topic: bangxun001  # 修改：加上 bemfa/ 前缀
+    - topic: bemfa/bangxun001  # 必须带 bemfa/ 前缀
       then:
         - lambda: |-
             if (x == "on") {
@@ -113,14 +114,14 @@ switch:
     on_turn_on:
       - switch.turn_on: relay_led
       - mqtt.publish:
-          topic: bangxun001  # 修改：加上 bemfa/ 前缀
+          topic: bemfa/bangxun001  # 必须带 bemfa/ 前缀
           payload: "on"
 
     # 当继电器关闭时，同步状态到巴法云
     on_turn_off:
       - switch.turn_off: relay_led
       - mqtt.publish:
-          topic: bangxun001  # 修改：加上 bemfa/ 前缀
+          topic: bemfa/bangxun001  # 必须带 bemfa/ 前缀
           payload: "off"
 
   - platform: gpio
