@@ -97,7 +97,7 @@ interval:
 # ==========================================
 mqtt_subscribe:
   - id: bemfa_control
-    topic: "mysocket001"           # 【重要】请替换为巴法云控制台中创建的插座主题名称
+    topic: "bangxun001"           # 【重要】请替换为巴法云控制台中创建的插座主题名称
     qos: 0
     then:
       - lambda: |-
@@ -119,14 +119,14 @@ switch:
     on_turn_on:
       - switch.turn_on: relay_led
       - mqtt.publish:
-          topic: "mysocket001"     # 【重要】请替换为巴法云控制台中创建的插座主题名称
+          topic: "bangxun001"     # 【重要】请替换为巴法云控制台中创建的插座主题名称
           payload: "on"
 
     # 【修改】当继电器关闭时，同步状态到巴法云
     on_turn_off:
       - switch.turn_off: relay_led
       - mqtt.publish:
-          topic: "mysocket001"     # 【重要】请替换为巴法云控制台中创建的插座主题名称
+          topic: "bangxun001"     # 【重要】请替换为巴法云控制台中创建的插座主题名称
           payload: "off"
 
   - platform: gpio
