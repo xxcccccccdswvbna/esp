@@ -30,8 +30,8 @@ substitutions:
   button_pin: GPIO0
   relay_a_pin: GPIO26
   relay_b_pin: GPIO25
-  ld2412_tx_pin: GPIO19  
-  ld2412_rx_pin: GPIO18  
+  ld2412_tx_pin: GPIO18  
+  ld2412_rx_pin: GPIO19  
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
 
@@ -51,7 +51,7 @@ uart:
   - id: uart_ld2412
     tx_pin: $ld2412_tx_pin
     rx_pin: $ld2412_rx_pin
-    baud_rate: 256000
+    baud_rate: 115200 
     parity: NONE
     stop_bits: 1
 
