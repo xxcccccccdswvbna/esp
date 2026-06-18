@@ -1,15 +1,19 @@
 esphome:
   name: smartoutletv1
   name_add_mac_suffix: True
-  comment: 基于ESP32的墙壁智能插座，磁保持继电器+计量+LD2412人体存在。支持OTA与本地网页控制。
+  comment: ESP32-MINI-1智能插座+LD2412(GPIO18/19)。已修复MINI-1引脚冲突与高波特率丢包。
   project:
     name: "HA-DIYer.SmarOutlet-V1"
-    version: "1.0.8"
+    version: "1.1.0"
 
+# 🌟 关键：指定 MINI-1 板型，触发正确的引脚映射
 esp32:
-  board: esp32dev
+  board: esp32-mini-1
   framework:
     type: esp-idf
+    #  关键：禁用自动 PSRAM 检测，防止其抢占 GPIO18/19
+    sdkconfig_options:
+      CONFIG_ESP32_SPIRAM_SUPPORT: n
 
 logger:
 api:
@@ -30,11 +34,9 @@ substitutions:
   button_pin: GPIO0
   relay_a_pin: GPIO26
   relay_b_pin: GPIO25
-  
-  # 🌟 根据原理图修正：IO18是TX，IO19是RX
-  ld2412_tx_pin: GPIO19  
-  ld2412_rx_pin: GPIO18  
-  
+  # 🌟 保持物理接线不变
+  ld2412_tx_pin: GPIO18  
+  ld2412_rx_pin: GPIO19  
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
 
@@ -54,24 +56,18 @@ uart:
   - id: uart_ld2412
     tx_pin: $ld2412_tx_pin
     rx_pin: $ld2412_rx_pin
-    baud_rate: 115200    # 🌟 LD2412 官方默认波特率
+    baud_rate: 256000
     parity: NONE
     stop_bits: 1
+    # 🌟 关键：非原生UART引脚跑256k必须加大缓冲，否则必丢包
+    rx_buffer_size: 2048 
 
 output:
   - platform: gpio
-    pin:
-      number: $relay_a_pin
-      mode:
-        output: true
-        pulldown: true
+    pin: { number: $relay_a_pin, mode: { output: true, pulldown: true } }
     id: relay_a_pin_output
   - platform: gpio
-    pin:
-      number: $relay_b_pin
-      mode:
-        output: true
-        pulldown: true
+    pin: { number: $relay_b_pin, mode: { output: true, pulldown: true } }
     id: relay_b_pin_output
 
 switch:
@@ -91,12 +87,9 @@ switch:
       - output.turn_on: relay_a_pin_output
       - delay: 100ms
       - output.turn_off: relay_a_pin_output
-
   - platform: restart
     name: "Restart"
     id: outlet_reset
-
-  # 🌟 修复中文ID冲突：在name中加入唯一英文标识
   - platform: ld2412
     engineering_mode:
       name: "LD2412 工程模式 (Eng)"
@@ -107,12 +100,7 @@ switch:
 
 binary_sensor:
   - platform: gpio
-    pin:
-      number: $button_pin
-      inverted: true
-      mode:
-        input: true
-        pullup: true
+    pin: { number: $button_pin, inverted: true, mode: { input: true, pullup: true } }
     name: "button"
     internal: True
     on_click:
@@ -120,60 +108,35 @@ binary_sensor:
       max_length: 350ms
       then:
         - if:
-            condition:
-              switch.is_on: outlet_switch
-            then:
-              - switch.turn_off: outlet_switch
-            else:
-              - switch.turn_on: outlet_switch
+            condition: { switch.is_on: outlet_switch }
+            then: [ switch.turn_off: outlet_switch ]
+            else: [ switch.turn_on: outlet_switch ]
     on_multi_click:
-      - timing:
-          - ON for at least 10s
+      - timing: [ ON for at least 10s ]
         then:
-          - logger.log:
-              level: INFO
-              format: "FACTORY RESET"
+          - logger.log: { level: INFO, format: "FACTORY RESET" }
           - button.press: btn_factory_reset
-
-  # 🌟 修复中文ID冲突
   - platform: ld2412
-    has_target:
-      name: "LD2412 有人 (Target)"
-      id: ld2412_target
-    has_moving_target:
-      name: "LD2412 微动 (Moving)"
-      id: ld2412_moving
-    has_still_target:
-      name: "LD2412 静止 (Still)"
-      id: ld2412_still
+    has_target: { name: "LD2412 有人 (Target)", id: ld2412_target }
+    has_moving_target: { name: "LD2412 微动 (Moving)", id: ld2412_moving }
+    has_still_target: { name: "LD2412 静止 (Still)", id: ld2412_still }
 
 status_led:
-  pin:
-    number: $led_pin
-    inverted: true
+  pin: { number: $led_pin, inverted: true }
 
 sensor:
   - platform: bl0940
     uart_id: uart_bl0940
-    voltage:
-      name: 'Voltage'
-      accuracy_decimals: 0
-    current:
-      name: 'Current'
-    power:
-      name: 'Power'
-      accuracy_decimals: 1
-    energy:
-      name: 'Energy'
-      accuracy_decimals: 3
-      id: bl0940_energy
+    voltage: { name: 'Voltage', accuracy_decimals: 0 }
+    current: { name: 'Current' }
+    power: { name: 'Power', accuracy_decimals: 1 }
+    energy: { name: 'Energy', accuracy_decimals: 3, id: bl0940_energy }
     read_command: 0x58
     write_command: 0xA8
     legacy_mode: false
     resistor_one: 0.51
     resistor_two: 1950
     update_interval: 1s
-
   - platform: template
     name: "Total Daily Energy"
     id: bl0940_DailyEnergy
@@ -186,30 +149,18 @@ sensor:
         id(var_energy) = id(bl0940_energy).state;
       }
       return id(bl0940_energy).state - id(var_energy);
-
-  # 🌟 修复中文ID冲突
   - platform: ld2412
-    moving_distance:
-      name: "LD2412 运动距离 (MDist)"
-      id: ld2412_moving_dist
-    still_distance:
-      name: "LD2412 静止距离 (SDist)"
-      id: ld2412_still_dist
-    moving_energy:
-      name: "LD2412 运动能量 (MEnergy)"
-      id: ld2412_moving_energy
-    still_energy:
-      name: "LD2412 静止能量 (SEnergy)"
-      id: ld2412_still_energy
-    detection_distance:
-      name: "LD2412 检测距离 (Det)"
-      id: ld2412_det_dist
-    light:
-      name: "LD2412 光照度 (Lux)"
-      id: ld2412_light
+    moving_distance: { name: "LD2412 运动距离 (MDist)", id: ld2412_moving_dist }
+    still_distance: { name: "LD2412 静止距离 (SDist)", id: ld2412_still_dist }
+    moving_energy: { name: "LD2412 运动能量 (MEnergy)", id: ld2412_moving_energy }
+    still_energy: { name: "LD2412 静止能量 (SEnergy)", id: ld2412_still_energy }
+    detection_distance: { name: "LD2412 检测距离 (Det)", id: ld2412_det_dist }
+    light: { name: "LD2412 光照度 (Lux)", id: ld2412_light }
 
 ld2412:
   uart_id: uart_ld2412
+  # 🌟 关键：降低查询频率，给非原生UART喘息时间
+  throttle_use_time: 500ms
 
 number:
   - platform: bl0940
@@ -217,21 +168,11 @@ number:
     voltage_calibration: { name: Voltage Calibration }
     power_calibration: { name: Power Calibration }
     energy_calibration: { name: Energy Calibration }
-
-  # 🌟 修复中文ID冲突
   - platform: ld2412
-    timeout: 
-      name: "LD2412 存在超时 (Timeout)"
-      id: ld2412_timeout
-    min_distance_gate: 
-      name: "LD2412 最小距离门 (MinGate)"
-      id: ld2412_min_gate
-    max_distance_gate: 
-      name: "LD2412 最大距离门 (MaxGate)"
-      id: ld2412_max_gate
-    light_threshold: 
-      name: "LD2412 光照阈值 (Thresh)"
-      id: ld2412_light_thresh
+    timeout: { name: "LD2412 存在超时 (Timeout)", id: ld2412_timeout }
+    min_distance_gate: { name: "LD2412 最小距离门 (MinGate)", id: ld2412_min_gate }
+    max_distance_gate: { name: "LD2412 最大距离门 (MaxGate)", id: ld2412_max_gate }
+    light_threshold: { name: "LD2412 光照阈值 (Thresh)", id: ld2412_light_thresh }
 
 time:
   - platform: homeassistant
@@ -250,25 +191,12 @@ button:
     name: Factory Reset
     internal: True
     id: btn_factory_reset
-    
-  # 🌟 修复中文ID冲突
   - platform: ld2412
-    factory_reset: 
-      name: "LD2412 恢复出厂 (Reset)"
-      id: ld2412_factory_reset
-    restart: 
-      name: "LD2412 重启雷达 (Restart)"
-      id: ld2412_restart
-    query_params: 
-      name: "LD2412 查询参数 (Query)"
-      id: ld2412_query
+    factory_reset: { name: "LD2412 恢复出厂 (Reset)", id: ld2412_factory_reset }
+    restart: { name: "LD2412 重启雷达 (Restart)", id: ld2412_restart }
+    query_params: { name: "LD2412 查询参数 (Query)", id: ld2412_query }
 
 text_sensor:
-  # 🌟 修复中文ID冲突
   - platform: ld2412
-    version: 
-      name: "LD2412 固件版本 (Ver)"
-      id: ld2412_version
-    mac_address: 
-      name: "LD2412 MAC地址 (MAC)"
-      id: ld2412_mac
+    version: { name: "LD2412 固件版本 (Ver)", id: ld2412_version }
+    mac_address: { name: "LD2412 MAC地址 (MAC)", id: ld2412_mac }
