@@ -4,7 +4,7 @@ esphome:
   comment: 基于ESP32的墙壁智能插座，磁保持继电器+计量+LD2412人体存在。支持OTA与本地网页控制。
   project:
     name: "HA-DIYer.SmarOutlet-V1"
-    version: "1.0.5"
+    version: "1.0.6"
 
 esp32:
   board: esp32dev
@@ -14,7 +14,6 @@ esp32:
 logger:
 api:
 
-# 启用本地网页服务器
 web_server:
   port: 80
   version: 2
@@ -31,12 +30,8 @@ substitutions:
   button_pin: GPIO0
   relay_a_pin: GPIO26
   relay_b_pin: GPIO25
-  
-  # LD2412 雷达引脚（软件修正接反问题）
   ld2412_tx_pin: GPIO19  
   ld2412_rx_pin: GPIO18  
-  
-  # BL0940 计量芯片引脚
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
 
@@ -56,7 +51,7 @@ uart:
   - id: uart_ld2412
     tx_pin: $ld2412_tx_pin
     rx_pin: $ld2412_rx_pin
-    baud_rate: 256000    # LD2412 默认波特率
+    baud_rate: 256000
     parity: NONE
     stop_bits: 1
 
@@ -98,13 +93,16 @@ switch:
     name: "Restart"
     id: outlet_reset
 
+  # 🌟 修复：为中文名称添加唯一的 object_id
   - platform: ld2412
     engineering_mode:
       name: "LD2412 工程模式"
       id: ld2412_eng_mode
+      object_id: ld2412_engineering_mode
     bluetooth:
       name: "LD2412 蓝牙控制"
       id: ld2412_bluetooth
+      object_id: ld2412_bluetooth_switch
 
 binary_sensor:
   - platform: gpio
@@ -136,17 +134,20 @@ binary_sensor:
               format: "FACTORY RESET"
           - button.press: btn_factory_reset
 
-  # 🌟 修复：为所有中文名称添加唯一的英文 id
+  # 🌟 修复：为中文名称添加唯一的 object_id
   - platform: ld2412
     has_target:
       name: "LD2412 有人"
       id: ld2412_target
+      object_id: ld2412_target
     has_moving_target:
       name: "LD2412 微动"
       id: ld2412_moving
+      object_id: ld2412_moving
     has_still_target:
       name: "LD2412 静止"
       id: ld2412_still
+      object_id: ld2412_still
 
 status_led:
   pin:
@@ -188,26 +189,32 @@ sensor:
       }
       return id(bl0940_energy).state - id(var_energy);
 
-  # 🌟 修复：为所有中文名称添加唯一的英文 id
+  # 🌟 修复：为中文名称添加唯一的 object_id
   - platform: ld2412
     moving_distance:
       name: "LD2412 运动距离"
       id: ld2412_moving_dist
+      object_id: ld2412_moving_dist
     still_distance:
       name: "LD2412 静止距离"
       id: ld2412_still_dist
+      object_id: ld2412_still_dist
     moving_energy:
       name: "LD2412 运动能量"
       id: ld2412_moving_energy
+      object_id: ld2412_moving_energy
     still_energy:
       name: "LD2412 静止能量"
       id: ld2412_still_energy
+      object_id: ld2412_still_energy
     detection_distance:
       name: "LD2412 检测距离"
       id: ld2412_det_dist
+      object_id: ld2412_det_dist
     light:
       name: "LD2412 光照度"
       id: ld2412_light
+      object_id: ld2412_light
 
 ld2412:
   uart_id: uart_ld2412
@@ -219,20 +226,24 @@ number:
     power_calibration: { name: Power Calibration }
     energy_calibration: { name: Energy Calibration }
 
-  # 🌟 修复：为所有中文名称添加唯一的英文 id
+  # 🌟 修复：为中文名称添加唯一的 object_id
   - platform: ld2412
     timeout: 
       name: "LD2412 存在超时"
       id: ld2412_timeout
+      object_id: ld2412_timeout
     min_distance_gate: 
       name: "LD2412 最小距离门"
       id: ld2412_min_gate
+      object_id: ld2412_min_gate
     max_distance_gate: 
       name: "LD2412 最大距离门"
       id: ld2412_max_gate
+      object_id: ld2412_max_gate
     light_threshold: 
       name: "LD2412 光照阈值"
       id: ld2412_light_thresh
+      object_id: ld2412_light_thresh
 
 time:
   - platform: homeassistant
@@ -252,24 +263,29 @@ button:
     internal: True
     id: btn_factory_reset
     
-  # 🌟 修复：为所有中文名称添加唯一的英文 id
+  # 🌟 修复：为中文名称添加唯一的 object_id
   - platform: ld2412
     factory_reset: 
       name: "LD2412 恢复出厂"
       id: ld2412_factory_reset
+      object_id: ld2412_factory_reset
     restart: 
       name: "LD2412 重启雷达"
       id: ld2412_restart
+      object_id: ld2412_restart
     query_params: 
       name: "LD2412 查询参数"
       id: ld2412_query
+      object_id: ld2412_query
 
 text_sensor:
-  # 🌟 修复：为所有中文名称添加唯一的英文 id
+  # 🌟 修复：为中文名称添加唯一的 object_id
   - platform: ld2412
     version: 
       name: "LD2412 固件版本"
       id: ld2412_version
+      object_id: ld2412_version
     mac_address: 
       name: "LD2412 MAC地址"
       id: ld2412_mac
+      object_id: ld2412_mac
