@@ -1,6 +1,6 @@
 esphome:
-  name: bangxun1s
-  friendly_name: bangxun
+  name: ee
+  friendly_name: EE
 
 esp8266:
   board: esp01_1m
@@ -29,16 +29,27 @@ wifi:
 captive_portal:
 
 # ==========================================
-# 【新增】巴法云 MQTT 配置
+# 【巴法云 MQTT 配置】
 # ==========================================
 mqtt:
   broker: bemfa.com
   port: 8344
-  username: "97109945d7e24559b3e4ca7a1f8ef160"     # 巴法云用户私钥，需填入 secrets.yaml
-  password: "97109945d7e24559b3e4ca7a1f8ef160"      # 巴法云用户私钥，需填入 secrets.yaml
-  discovery: false                 # 关闭 Home Assistant 自动发现，避免冲突
-  topic_prefix: "bemfa"                 # 留空，防止巴法云收到的主题带有前缀
-  id: mqtt_client                  # 指定一个ID，方便后续订阅组件引用
+  username: "97109945d7e24559b3e4ca7a1f8ef160"
+  password: "97109945d7e24559b3e4ca7a1f8ef160"
+  discovery: false
+  topic_prefix: ""
+  id: mqtt_client
+
+  # 【核心】监听巴法云下发的控制指令
+  on_message:
+    - topic: bangxun001
+      then:
+        - lambda: |-
+            if (x == "on") {
+              id(relay).turn_on();
+            } else if (x == "off") {
+              id(relay).turn_off();
+            }
 # ==========================================
 
 web_server:
@@ -92,22 +103,6 @@ interval:
             }
           }
 
-# ==========================================
-# 【新增】监听巴法云下发的控制指令
-# ==========================================
-mqtt_subscribe:
-  - id: bemfa_control
-    topic: "bangxun001"           # 【重要】请替换为巴法云控制台中创建的插座主题名称
-    qos: 0
-    then:
-      - lambda: |-
-          if (x == "on") {
-            id(relay).turn_on();
-          } else if (x == "off") {
-            id(relay).turn_off();
-          }
-# ==========================================
-
 switch:
   - platform: gpio
     id: relay
@@ -115,18 +110,18 @@ switch:
 
     pin: GPIO15
 
-    # 【修改】当继电器打开时，同步状态到巴法云
+    # 当继电器打开时，同步状态到巴法云
     on_turn_on:
       - switch.turn_on: relay_led
       - mqtt.publish:
-          topic: "bangxun001"     # 【重要】请替换为巴法云控制台中创建的插座主题名称
+          topic: bangxun001
           payload: "on"
 
-    # 【修改】当继电器关闭时，同步状态到巴法云
+    # 当继电器关闭时，同步状态到巴法云
     on_turn_off:
       - switch.turn_off: relay_led
       - mqtt.publish:
-          topic: "bangxun001"     # 【重要】请替换为巴法云控制台中创建的插座主题名称
+          topic: bangxun001
           payload: "off"
 
   - platform: gpio
