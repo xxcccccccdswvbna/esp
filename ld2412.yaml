@@ -1,0 +1,264 @@
+esphome:
+  name: smartoutletv1
+  name_add_mac_suffix: True
+  comment: 基于ESP32的墙壁智能插座，磁保持继电器+计量+LD2412人体存在。支持OTA与本地网页控制。
+  project:
+    name: "HA-DIYer.SmarOutlet-V1"
+    version: "1.0.4"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+api:
+
+# 🌟 启用本地网页服务器（满足您的网页功能需求）
+web_server:
+  port: 80
+  version: 2  # 使用新版网页界面，移动端体验更好
+
+wifi:
+  ap:
+    ssid: "SmartOutlet(V1) Hotspot"
+    password: "12345678"
+
+captive_portal:
+
+substitutions:
+  led_pin: GPIO27
+  button_pin: GPIO0
+  relay_a_pin: GPIO26
+  relay_b_pin: GPIO25
+  
+  # 🛠️ LD2412 雷达引脚（软件修正接反问题）
+  # 原理：ESP32的GPIO18接了雷达的TX，所以GPIO18实际上是接收端(rx)；
+  #       ESP32的GPIO19接了雷达的RX，所以GPIO19实际上是发送端(tx)。
+  ld2412_tx_pin: GPIO19  # 作为发送端，接雷达的RX
+  ld2412_rx_pin: GPIO18  # 作为接收端，接雷达的TX
+  
+  # BL0940 计量芯片引脚
+  bl0940_tx_pin: GPIO21
+  bl0940_rx_pin: GPIO5
+
+globals:
+   - id: var_energy
+     type: float
+     restore_value: yes
+     initial_value: "0"
+
+# 两个独立的 UART 串口，互不干扰
+uart:
+  # BL0940 计量芯片 UART
+  - id: uart_bl0940
+    tx_pin: $bl0940_tx_pin
+    rx_pin: $bl0940_rx_pin
+    baud_rate: 4800
+    stop_bits: 1
+    
+  # LD2412 雷达 UART
+  - id: uart_ld2412
+    tx_pin: $ld2412_tx_pin
+    rx_pin: $ld2412_rx_pin
+    baud_rate: 115200    # 🛠️ 修正：LD2412 的默认波特率是 115200
+    parity: NONE
+    stop_bits: 1
+
+output:
+  - platform: gpio
+    pin:
+      number: $relay_a_pin
+      mode:
+        output: true
+        pulldown: true
+    id: relay_a_pin_output
+  - platform: gpio
+    pin:
+      number: $relay_b_pin
+      mode:
+        output: true
+        pulldown: true
+    id: relay_b_pin_output
+
+switch:
+  - platform: template
+    name: "Switch"
+    id: outlet_switch
+    device_class: outlet
+    optimistic: True
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - output.turn_off: relay_a_pin_output
+      - output.turn_on: relay_b_pin_output
+      - delay: 100ms
+      - output.turn_off: relay_b_pin_output
+    turn_off_action:
+      - output.turn_off: relay_b_pin_output
+      - output.turn_on: relay_a_pin_output
+      - delay: 100ms
+      - output.turn_off: relay_a_pin_output
+
+  - platform: restart
+    name: "Restart"
+    id: outlet_reset
+
+  # LD2412 工程模式与蓝牙开关
+  - platform: ld2412
+    engineering_mode:
+      name: "LD2412 Engineering Mode"
+    bluetooth:
+      name: "LD2412 Bluetooth"
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: $button_pin
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    name: "button"
+    internal: True
+    on_click:
+    - min_length: 50ms
+      max_length: 350ms
+      then:
+        - if:
+            condition:
+              switch.is_on: outlet_switch
+            then:
+              - switch.turn_off: outlet_switch
+            else:
+              - switch.turn_on: outlet_switch
+    on_multi_click:
+      - timing:
+          - ON for at least 10s
+        then:
+          - logger.log:
+              level: INFO
+              format: "FACTORY RESET"
+          - button.press: btn_factory_reset
+
+  # LD2412 存在状态传感器
+  - platform: ld2412
+    has_target:
+      name: "LD2412 有人"
+    has_moving_target:
+      name: "LD2412 微动"
+    has_still_target:
+      name: "LD2412 静止"
+
+status_led:
+  pin:
+    number: $led_pin
+    inverted: true
+
+sensor:
+  # BL0940 计量
+  - platform: bl0940
+    uart_id: uart_bl0940
+    voltage:
+      name: 'Voltage'
+      accuracy_decimals: 0
+    current:
+      name: 'Current'
+    power:
+      name: 'Power'
+      accuracy_decimals: 1
+    energy:
+      name: 'Energy'
+      accuracy_decimals: 3
+      id: bl0940_energy
+    read_command: 0x58
+    write_command: 0xA8
+    legacy_mode: false
+    resistor_one: 0.51
+    resistor_two: 1950
+    update_interval: 1s
+
+  # 当日用电量计算
+  - platform: template
+    name: "Total Daily Energy"
+    id: bl0940_DailyEnergy
+    device_class: energy
+    accuracy_decimals: 3
+    unit_of_measurement: 'kWh'
+    update_interval: 1min
+    lambda: |-
+      if ((id(var_energy) > id(bl0940_energy).state) || (id(var_energy) == 0) || isnan(id(var_energy))) {
+        id(var_energy) = id(bl0940_energy).state;
+      }
+      return id(bl0940_energy).state - id(var_energy);
+
+  # LD2412 距离与能量传感器
+  - platform: ld2412
+    moving_distance:
+      name: "LD2412 运动距离"
+    still_distance:
+      name: "LD2412 静止距离"
+    moving_energy:
+      name: "LD2412 运动能量"
+    still_energy:
+      name: "LD2412 静止能量"
+    detection_distance:
+      name: "LD2412 检测距离"
+    light:
+      name: "LD2412 光照度"
+
+# LD2412 顶层组件声明
+ld2412:
+  uart_id: uart_ld2412
+
+number:
+  - platform: bl0940
+    current_calibration: { name: Current Calibration }
+    voltage_calibration: { name: Voltage Calibration }
+    power_calibration: { name: Power Calibration }
+    energy_calibration: { name: Energy Calibration }
+
+  # LD2412 阈值与超时设置
+  - platform: ld2412
+    timeout: { name: "LD2412 存在超时" }
+    min_distance_gate: { name: "LD2412 最小距离门" }
+    max_distance_gate: { name: "LD2412 最大距离门" }
+    light_threshold: { name: "LD2412 光照阈值" }
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    on_time:
+      - seconds: 0
+        minutes: 0
+        hours: 0
+        then:
+          - lambda: id(var_energy) = id(bl0940_energy).state;
+
+# 注意：GPIO18 和 GPIO19 已被 LD2412 占用，红外/射频发射功能已物理失效，故保持注释。
+# remote_transmitter:
+#   - id: ir_remote_transmitter_id
+#     pin: GPIO18
+#     carrier_duty_percent: 50%
+#   - id: rf_remote_transmitter_id
+#     pin: GPIO19
+#     carrier_duty_percent: 100%
+
+button:
+  - platform: bl0940
+    name: Reset Calibration
+  - platform: factory_reset
+    name: Factory Reset
+    internal: True
+    id: btn_factory_reset
+    
+  # LD2412 控制按钮
+  - platform: ld2412
+    factory_reset: { name: "LD2412 恢复出厂" }
+    restart: { name: "LD2412 重启雷达" }
+    query_params: { name: "LD2412 查询参数" }
+
+text_sensor:
+  # LD2412 固件版本与MAC地址
+  - platform: ld2412
+    version: { name: "LD2412 固件版本" }
+    mac_address: { name: "LD2412 MAC地址" }
