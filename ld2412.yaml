@@ -4,7 +4,7 @@ esphome:
   comment: 基于ESP32的墙壁智能插座，磁保持继电器+计量+LD2412人体存在。支持OTA与本地网页控制。
   project:
     name: "HA-DIYer.SmarOutlet-V1"
-    version: "1.0.7"
+    version: "1.0.8"
 
 esp32:
   board: esp32dev
@@ -30,8 +30,11 @@ substitutions:
   button_pin: GPIO0
   relay_a_pin: GPIO26
   relay_b_pin: GPIO25
-  ld2412_tx_pin: GPIO19  
-  ld2412_rx_pin: GPIO18  
+  
+  # 🌟 根据原理图修正：IO18是TX，IO19是RX
+  ld2412_tx_pin: GPIO18  
+  ld2412_rx_pin: GPIO19  
+  
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
 
@@ -51,7 +54,7 @@ uart:
   - id: uart_ld2412
     tx_pin: $ld2412_tx_pin
     rx_pin: $ld2412_rx_pin
-    baud_rate: 115200 
+    baud_rate: 115200    # 🌟 LD2412 官方默认波特率
     parity: NONE
     stop_bits: 1
 
@@ -93,7 +96,7 @@ switch:
     name: "Restart"
     id: outlet_reset
 
-  # 🌟 修复：移除 object_id，在 name 中加入唯一英文缩写 (Eng) 和 (BT)
+  # 🌟 修复中文ID冲突：在name中加入唯一英文标识
   - platform: ld2412
     engineering_mode:
       name: "LD2412 工程模式 (Eng)"
@@ -132,7 +135,7 @@ binary_sensor:
               format: "FACTORY RESET"
           - button.press: btn_factory_reset
 
-  # 🌟 修复：移除 object_id，在 name 中加入唯一英文缩写
+  # 🌟 修复中文ID冲突
   - platform: ld2412
     has_target:
       name: "LD2412 有人 (Target)"
@@ -184,7 +187,7 @@ sensor:
       }
       return id(bl0940_energy).state - id(var_energy);
 
-  # 🌟 修复：移除 object_id，在 name 中加入唯一英文缩写 (如 MDist, SDist 等)
+  # 🌟 修复中文ID冲突
   - platform: ld2412
     moving_distance:
       name: "LD2412 运动距离 (MDist)"
@@ -215,7 +218,7 @@ number:
     power_calibration: { name: Power Calibration }
     energy_calibration: { name: Energy Calibration }
 
-  # 🌟 修复：移除 object_id，在 name 中加入唯一英文缩写
+  # 🌟 修复中文ID冲突
   - platform: ld2412
     timeout: 
       name: "LD2412 存在超时 (Timeout)"
@@ -248,7 +251,7 @@ button:
     internal: True
     id: btn_factory_reset
     
-  # 🌟 修复：移除 object_id，在 name 中加入唯一英文缩写
+  # 🌟 修复中文ID冲突
   - platform: ld2412
     factory_reset: 
       name: "LD2412 恢复出厂 (Reset)"
@@ -261,7 +264,7 @@ button:
       id: ld2412_query
 
 text_sensor:
-  # 🌟 修复：移除 object_id，在 name 中加入唯一英文缩写
+  # 🌟 修复中文ID冲突
   - platform: ld2412
     version: 
       name: "LD2412 固件版本 (Ver)"
