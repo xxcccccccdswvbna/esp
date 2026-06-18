@@ -37,7 +37,7 @@ mqtt:
   username: "97109945d7e24559b3e4ca7a1f8ef160"     # 巴法云用户私钥，需填入 secrets.yaml
   password: "97109945d7e24559b3e4ca7a1f8ef160"      # 巴法云用户私钥，需填入 secrets.yaml
   discovery: false                 # 关闭 Home Assistant 自动发现，避免冲突
-  topic_prefix: ""                 # 留空，防止巴法云收到的主题带有前缀
+  topic_prefix: "bemfa"                 # 留空，防止巴法云收到的主题带有前缀
   id: mqtt_client                  # 指定一个ID，方便后续订阅组件引用
 # ==========================================
 
