@@ -10,7 +10,7 @@ logger:
   baud_rate: 0
 
 # 如果不需要 Home Assistant 本地集成，强烈建议注释掉 api 以节省内存
-# api:
+api:
 
 ota:
   - platform: esphome
