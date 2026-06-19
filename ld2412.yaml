@@ -4,7 +4,7 @@ esphome:
   comment: 基于ESP32的墙壁智能插座，磁保持继电器+计量+LD2412人体存在。支持OTA与本地网页控制。
   project:
     name: "HA-DIYer.SmarOutlet-V1"
-    version: "1.0.7"
+    version: "1.1.2"
 
 esp32:
   board: esp32dev
@@ -30,16 +30,34 @@ substitutions:
   button_pin: GPIO0
   relay_a_pin: GPIO26
   relay_b_pin: GPIO25
+  # 您目前使用的引脚
   ld2412_tx_pin: GPIO1  
   ld2412_rx_pin: GPIO3  
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
 
+# 1. 全局变量定义（增加了时长统计变量）
 globals:
-   - id: var_energy
-     type: float
-     restore_value: yes
-     initial_value: "0"
+  - id: var_energy
+    type: float
+    restore_value: yes
+    initial_value: "0"
+  - id: current_presence_seconds
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: last_presence_seconds
+    type: uint32_t
+    restore_value: yes
+    initial_value: '0'
+  - id: current_absence_seconds
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: last_absence_seconds
+    type: uint32_t
+    restore_value: yes
+    initial_value: '0'
 
 uart:
   - id: uart_bl0940
@@ -93,7 +111,6 @@ switch:
     name: "Restart"
     id: outlet_reset
 
-  # 🌟 修复：移除 object_id，在 name 中加入唯一英文缩写 (Eng) 和 (BT)
   - platform: ld2412
     engineering_mode:
       name: "LD2412 工程模式 (Eng)"
@@ -132,11 +149,19 @@ binary_sensor:
               format: "FACTORY RESET"
           - button.press: btn_factory_reset
 
-  # 🌟 修复：移除 object_id，在 name 中加入唯一英文缩写
+  # 2. 修改 LD2412 人体存在，增加状态切换记录
   - platform: ld2412
     has_target:
       name: "LD2412 有人 (Target)"
       id: ld2412_target
+      on_press:
+        then:
+          - lambda: |-
+              id(last_absence_seconds) = id(current_absence_seconds);
+      on_release:
+        then:
+          - lambda: |-
+              id(last_presence_seconds) = id(current_presence_seconds);
     has_moving_target:
       name: "LD2412 微动 (Moving)"
       id: ld2412_moving
@@ -184,7 +209,6 @@ sensor:
       }
       return id(bl0940_energy).state - id(var_energy);
 
-  # 🌟 修复：移除 object_id，在 name 中加入唯一英文缩写 (如 MDist, SDist 等)
   - platform: ld2412
     moving_distance:
       name: "LD2412 运动距离 (MDist)"
@@ -205,6 +229,43 @@ sensor:
       name: "LD2412 光照度 (Lux)"
       id: ld2412_light
 
+  # 4. 增加时长统计传感器与 WiFi 信号
+  - platform: template
+    name: "当前有人时长"
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    lambda: |-
+      return id(current_presence_seconds);
+    update_interval: 1s
+
+  - platform: template
+    name: "上次有人时长"
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    lambda: |-
+      return id(last_presence_seconds);
+    update_interval: 5s
+
+  - platform: template
+    name: "当前无人时长"
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    lambda: |-
+      return id(current_absence_seconds);
+    update_interval: 1s
+
+  - platform: template
+    name: "上次无人时长"
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
+    lambda: |-
+      return id(last_absence_seconds);
+    update_interval: 5s
+
+  - platform: wifi_signal
+    name: "WiFi RSSI"
+    update_interval: 60s
+
 ld2412:
   uart_id: uart_ld2412
 
@@ -215,7 +276,6 @@ number:
     power_calibration: { name: Power Calibration }
     energy_calibration: { name: Energy Calibration }
 
-  # 🌟 修复：移除 object_id，在 name 中加入唯一英文缩写
   - platform: ld2412
     timeout: 
       name: "LD2412 存在超时 (Timeout)"
@@ -248,7 +308,6 @@ button:
     internal: True
     id: btn_factory_reset
     
-  # 🌟 修复：移除 object_id，在 name 中加入唯一英文缩写
   - platform: ld2412
     factory_reset: 
       name: "LD2412 恢复出厂 (Reset)"
@@ -261,7 +320,6 @@ button:
       id: ld2412_query
 
 text_sensor:
-  # 🌟 修复：移除 object_id，在 name 中加入唯一英文缩写
   - platform: ld2412
     version: 
       name: "LD2412 固件版本 (Ver)"
@@ -269,3 +327,32 @@ text_sensor:
     mac_address: 
       name: "LD2412 MAC地址 (MAC)"
       id: ld2412_mac
+  # 5. 增加 ESPHome 版本传感器
+  - platform: version
+    name: "ESPHome Version"
+
+# 3. 增加定时任务（计算时长与自动重启离线雷达）
+interval:
+  - interval: 1s
+    then:
+      - if:
+          condition:
+            binary_sensor.is_on: ld2412_target
+          then:
+            - lambda: |-
+                id(current_presence_seconds)++;
+                id(current_absence_seconds) = 0;
+          else:
+            - lambda: |-
+                id(current_absence_seconds)++;
+                id(current_presence_seconds) = 0;
+
+  - interval: 5min
+    then:
+      - if:
+          condition:
+            lambda: |-
+              return isnan(id(ld2412_det_dist).state);
+          then:
+            - logger.log: "LD2412 Restart"
+            - button.press: ld2412_restart
