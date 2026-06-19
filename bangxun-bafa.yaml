@@ -1,0 +1,285 @@
+esphome:
+  name: ee
+  friendly_name: EE
+
+esp8266:
+  board: esp01_1m
+  restore_from_flash: true
+
+logger:
+  baud_rate: 0
+
+# 如果不需要 Home Assistant 本地集成，强烈建议注释掉 api 以节省内存
+# api:
+
+ota:
+  - platform: esphome
+    password: "chen1122"
+
+wifi:
+  ssid: "CC"
+  password: "chen1122"
+  min_auth_mode: WPA2
+  reboot_timeout: 0s
+  ap:
+    ssid: "EE-Setup"
+    password: "12345678"
+
+captive_portal:
+
+web_server:
+  port: 80
+
+# ================= 修正：巴法云 MQTT 配置 =================
+mqtt:
+  broker: bemfa.com
+  port: 9501  # 修正：使用巴法云普通端口 9501
+  
+  # 修正：用户名和密码留空（或随意填写），不需要账号密码
+  username: "" 
+  password: ""
+  
+  # 修正：Client ID 必须填写你的巴法云私钥 (UID)
+  client_id: "97109945d7e24559b3e4ca7a1f8ef160"   # <--- 替换为你的私钥
+  
+  discovery: false
+  birth_message: 
+  will_message: 
+
+  # 1. 连接成功时，使用 /up 指令同步初始状态（只更新云端，不触发推送）
+  on_connect:
+    then:
+      - if:
+          condition:
+            switch.is_on: relay
+          then:
+            - mqtt.publish:
+                topic: plug001/up  # <--- 替换为plug001，如 plug001/up
+                payload: "on"
+      - if:
+          condition:
+            switch.is_off: relay
+          then:
+            - mqtt.publish:
+                topic: plug001/up  # <--- 替换为plug001，如 plug001/up
+                payload: "off"
+
+  # 2. 订阅原始主题，接收巴法云下发的控制指令
+  on_message:
+    - topic: plug001  # <--- 替换为plug001，如 plug001
+      then:
+        - lambda: |-
+            // 兼容巴法云下发的 on/off 或 1/0 指令
+            if (x == "on" || x == "ON" || x == "1") {
+              id(relay).turn_on();
+            } else if (x == "off" || x == "OFF" || x == "0") {
+              id(relay).turn_off();
+            }
+# ==========================================================
+
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: Asia/Shanghai
+    on_time:
+      - seconds: 0
+        minutes: /1
+        then:
+          - script.execute: timer_control
+
+binary_sensor:
+  - platform: gpio
+    id: button_input
+    internal: true
+    pin:
+      number: GPIO14
+      mode: INPUT_PULLUP
+    filters:
+      - invert:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      - switch.toggle: relay
+
+globals:
+  - id: off_timer
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (id(off_timer) > 0) {
+            id(off_timer) -= 1;
+            if (id(off_timer) <= 0) {
+              id(off_timer) = 0;
+              id(relay).turn_off();
+            }
+          }
+
+switch:
+  - platform: gpio
+    id: relay
+    name: "插座开关"
+    pin: GPIO15
+    
+    on_turn_on:
+      - switch.turn_on: relay_led
+      # 修正：状态改变时，使用 /set 指令同步给其他订阅者
+      - mqtt.publish:
+          topic: plug001/set  # <--- 替换为plug001，如 plug001/set
+          payload: "on"
+          
+    on_turn_off:
+      - switch.turn_off: relay_led
+      # 修正：状态改变时，使用 /set 指令同步给其他订阅者
+      - mqtt.publish:
+          topic: plug001/set  # <--- 替换为plug001，如 plug001/set
+          payload: "off"
+
+  - platform: gpio
+    id: relay_led
+    internal: true
+    pin:
+      number: GPIO12
+      inverted: true
+
+  - platform: gpio
+    id: wifi_led
+    name: "WiFi状态灯"
+    pin:
+      number: GPIO13
+      inverted: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: template
+    id: timer_enable
+    name: 定时启用_Timer
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+
+number:
+  - platform: template
+    id: start_hour
+    name: 开始小时_StartHour
+    min_value: 0
+    max_value: 23
+    step: 1
+    restore_value: true
+    optimistic: true
+
+  - platform: template
+    id: start_minute
+    name: 开始分钟_StartMinute
+    min_value: 0
+    max_value: 59
+    step: 1
+    restore_value: true
+    optimistic: true
+
+  - platform: template
+    id: end_hour
+    name: 结束小时_EndHour
+    min_value: 0
+    max_value: 23
+    step: 1
+    restore_value: true
+    optimistic: true
+
+  - platform: template
+    id: end_minute
+    name: 结束分钟_EndMinute
+    min_value: 0
+    max_value: 59
+    step: 1
+    restore_value: true
+    optimistic: true
+
+sensor:
+  - platform: wifi_signal
+    id: wifi_db
+    name: WiFi信号_WiFiSignal
+
+  - platform: template
+    name: WiFi质量_WiFiQuality
+    lambda: |-
+      float x = id(wifi_db).state;
+      if (x <= -100) return 0;
+      if (x >= -50) return 100;
+      return 2 * (x + 100);
+    unit_of_measurement: "%"
+
+  - platform: template
+    name: "剩余倒计时(秒)"
+    lambda: |-
+      return id(off_timer);
+    update_interval: 1s
+
+  - platform: template
+    name: "剩余内存"
+    lambda: |-
+      return ESP.getFreeHeap();
+    update_interval: 60s
+
+script:
+  - id: timer_control
+    mode: restart
+    then:
+      - lambda: |-
+          if (id(off_timer) > 0) return;
+          if (!id(timer_enable).state) return;
+
+          auto now = id(sntp_time).now();
+          if (!now.is_valid()) return;
+
+          int cur = now.hour * 60 + now.minute;
+          int start = (int)id(start_hour).state * 60 + (int)id(start_minute).state;
+          int end = (int)id(end_hour).state * 60 + (int)id(end_minute).state;
+
+          bool on;
+          if (start < end)
+            on = cur >= start && cur < end;
+          else
+            on = cur >= start || cur < end;
+
+          if (on) {
+            if (!id(relay).state) id(relay).turn_on();
+          } else {
+            if (id(relay).state) id(relay).turn_off();
+          }
+
+button:
+  - platform: restart
+    name: "重启设备"
+
+  - platform: template
+    name: "30分钟关闭"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 30 * 60;
+
+  - platform: template
+    name: "1小时关闭"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 60 * 60;
+
+  - platform: template
+    name: "2小时关闭"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 120 * 60;
+
+  - platform: template
+    name: "4小时关闭"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 240 * 60;
+
+  - platform: template
+    name: "取消倒计时"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 0;
