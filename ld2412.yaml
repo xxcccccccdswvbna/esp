@@ -229,9 +229,10 @@ sensor:
       name: "LD2412 光照度 (Lux)"
       id: ld2412_light
 
-  # 4. 增加时长统计传感器与 WiFi 信号
+  # 🌟 修复：为中文名称添加唯一英文后缀，并显式指定 id
   - platform: template
-    name: "当前有人时长"
+    name: "当前有人时长 (Curr)"
+    id: sensor_curr_presence
     unit_of_measurement: "s"
     accuracy_decimals: 0
     lambda: |-
@@ -239,7 +240,8 @@ sensor:
     update_interval: 1s
 
   - platform: template
-    name: "上次有人时长"
+    name: "上次有人时长 (Last)"
+    id: sensor_last_presence
     unit_of_measurement: "s"
     accuracy_decimals: 0
     lambda: |-
@@ -247,7 +249,8 @@ sensor:
     update_interval: 5s
 
   - platform: template
-    name: "当前无人时长"
+    name: "当前无人时长 (Curr)"
+    id: sensor_curr_absence
     unit_of_measurement: "s"
     accuracy_decimals: 0
     lambda: |-
@@ -255,7 +258,8 @@ sensor:
     update_interval: 1s
 
   - platform: template
-    name: "上次无人时长"
+    name: "上次无人时长 (Last)"
+    id: sensor_last_absence
     unit_of_measurement: "s"
     accuracy_decimals: 0
     lambda: |-
@@ -264,6 +268,7 @@ sensor:
 
   - platform: wifi_signal
     name: "WiFi RSSI"
+    id: sensor_wifi_rssi
     update_interval: 60s
 
 ld2412:
