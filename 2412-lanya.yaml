@@ -21,11 +21,9 @@ api:
 # 1. MQTT 连接配置
 # ==========================================
 mqtt:
-  broker: !secret mqtt_broker
-  port: !secret mqtt_port
-  username: !secret mqtt_username
-  password: !secret mqtt_password
-  id: mqtt_client
+  broker: "192.168.6.88"  # <--- 替换为你 Mosquitto 所在的宿主机 IP
+  port: 1883
+  id: mqtt_client         # 给 MQTT 客户端起个ID，方便后面调用
 
 # ==========================================
 # 2. 蓝牙网关与抓包配置
@@ -60,14 +58,9 @@ web_server:
 # WiFi 配置
 # ==========================================
 wifi:
-  # 连接到主 WiFi 网络
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-  
-  # 当无法连接主网络时启用热点模式
   ap:
     ssid: "SmartOutlet(V1) Hotspot"
-    password: !secret wifi_ap_password
+    password: "12345678"
 
 captive_portal:
 
