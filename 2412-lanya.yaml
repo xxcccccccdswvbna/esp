@@ -34,7 +34,7 @@ esp32_ble_tracker:
     window: 1100ms
     active: false           # 被动扫描更省电
   on_ble_advertise:
-    - mac_address: !secret ble_fan_mac
+    - mac_address: "00:00:70:38:AB:CD"
       then:
         - lambda: |-
             auto datas = x.get_manufacturer_datas();
