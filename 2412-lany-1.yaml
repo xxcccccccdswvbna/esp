@@ -15,22 +15,20 @@ logger:
 api:
 
 # ==========================================
-# 蓝牙射频底层配置 (纯粹的蓝牙网关/发射器)
+# 蓝牙射频底层配置 (纯粹的指令发射器)
 # ==========================================
 esp32_ble:
   io_capability: none
 
-# 1. 蓝牙代理 (核心：让 HA 能够通过此 ESP32 发射控制信号给灯具)
 bluetooth_proxy:
   active: true
   cache_services: true
 
-# 2. 蓝牙服务端 (保留基础配置)
 esp32_ble_server:
   id: ble_server
   manufacturer_data: []
 
-# 3. 蓝牙扫描 (仅保留基础扫描，彻底删除状态监听与解析逻辑)
+# 仅保留基础扫描参数，彻底移除 on_ble_manufacturer_data_advertise 监听逻辑
 esp32_ble_tracker:
   scan_parameters:
     interval: 320ms
@@ -80,6 +78,16 @@ globals:
     type: uint32_t
     restore_value: yes
     initial_value: '0'
+  # --- BLE 发射专用变量 ---
+  - id: pkt_1
+    type: std::vector<uint8_t>
+    initial_value: 'std::vector<uint8_t>{}'
+  - id: pkt_2
+    type: std::vector<uint8_t>
+    initial_value: 'std::vector<uint8_t>{}'
+  - id: last_cmd_time
+    type: uint32_t
+    initial_value: '0'
 
 uart:
   - id: uart_bl0940
@@ -87,7 +95,6 @@ uart:
     rx_pin: $bl0940_rx_pin
     baud_rate: 4800
     stop_bits: 1
-    
   - id: uart_ld2412
     tx_pin: $ld2412_tx_pin
     rx_pin: $ld2412_rx_pin
@@ -97,18 +104,10 @@ uart:
 
 output:
   - platform: gpio
-    pin:
-      number: $relay_a_pin
-      mode:
-        output: true
-        pulldown: true
+    pin: { number: $relay_a_pin, mode: { output: true, pulldown: true } }
     id: relay_a_pin_output
   - platform: gpio
-    pin:
-      number: $relay_b_pin
-      mode:
-        output: true
-        pulldown: true
+    pin: { number: $relay_b_pin, mode: { output: true, pulldown: true } }
     id: relay_b_pin_output
 
 switch:
@@ -128,27 +127,47 @@ switch:
       - output.turn_on: relay_a_pin_output
       - delay: 100ms
       - output.turn_off: relay_a_pin_output
-
   - platform: restart
     name: "Restart"
     id: outlet_reset
-
   - platform: ld2412
-    engineering_mode:
-      name: "LD2412 工程模式 Eng"
-      id: ld2412_eng_mode
-    bluetooth:
-      name: "LD2412 蓝牙控制 BT"
-      id: ld2412_bluetooth
+    engineering_mode: { name: "LD2412 工程模式 Eng", id: ld2412_eng_mode }
+    bluetooth: { name: "LD2412 蓝牙控制 BT", id: ld2412_bluetooth }
+
+  # --- Dev1/Dev2 灯光开关控制 ---
+  - platform: template
+    name: "Dev1 Light Toggle"
+    id: dev1_light_toggle_ctrl
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          id(pkt_1) = {0xAA, 0x01, 0xCD, 0xAB, 0x38, 0x70, 0x01, 0x00}; 
+          id(pkt_2) = {0xAA, 0x02, 0xCD, 0xAB, 0x38, 0x70, 0x01, 0x00};
+      - script.execute: ble_send
+    turn_off_action:
+      - lambda: |-
+          id(pkt_1) = {0xAA, 0x01, 0xCD, 0xAB, 0x38, 0x70, 0x00, 0x00}; 
+          id(pkt_2) = {0xAA, 0x02, 0xCD, 0xAB, 0x38, 0x70, 0x00, 0x00};
+      - script.execute: ble_send
+
+  - platform: template
+    name: "Dev2 Light Toggle"
+    id: dev2_light_toggle_ctrl
+    optimistic: true
+    turn_on_action:
+      - lambda: |-
+          id(pkt_1) = {0xAA, 0x01, 0x92, 0x26, 0x35, 0x70, 0x01, 0x00}; 
+          id(pkt_2) = {0xAA, 0x02, 0x92, 0x26, 0x35, 0x70, 0x01, 0x00};
+      - script.execute: ble_send
+    turn_off_action:
+      - lambda: |-
+          id(pkt_1) = {0xAA, 0x01, 0x92, 0x26, 0x35, 0x70, 0x00, 0x00}; 
+          id(pkt_2) = {0xAA, 0x02, 0x92, 0x26, 0x35, 0x70, 0x00, 0x00};
+      - script.execute: ble_send
 
 binary_sensor:
   - platform: gpio
-    pin:
-      number: $button_pin
-      inverted: true
-      mode:
-        input: true
-        pullup: true
+    pin: { number: $button_pin, inverted: true, mode: { input: true, pullup: true } }
     name: "button"
     internal: True
     on_click:
@@ -156,67 +175,33 @@ binary_sensor:
       max_length: 350ms
       then:
         - if:
-            condition:
-              switch.is_on: outlet_switch
-            then:
-              - switch.turn_off: outlet_switch
-            else:
-              - switch.turn_on: outlet_switch
+            condition: { switch.is_on: outlet_switch }
+            then: [ - switch.turn_off: outlet_switch ]
+            else: [ - switch.turn_on: outlet_switch ]
     on_multi_click:
-      - timing:
-          - ON for at least 10s
-        then:
-          - logger.log:
-              level: INFO
-              format: "FACTORY RESET"
-          - button.press: btn_factory_reset
-
+      - timing: [ - ON for at least 10s ]
+        then: [ - logger.log: { level: INFO, format: "FACTORY RESET" }, - button.press: btn_factory_reset ]
   - platform: ld2412
-    has_target:
-      name: "LD2412 有人 Target"
-      id: ld2412_target
-      on_press:
-        then:
-          - lambda: |-
-              id(last_absence_seconds) = id(current_absence_seconds);
-      on_release:
-        then:
-          - lambda: |-
-              id(last_presence_seconds) = id(current_presence_seconds);
-    has_moving_target:
-      name: "LD2412 微动 Moving"
-      id: ld2412_moving
-    has_still_target:
-      name: "LD2412 静止 Still"
-      id: ld2412_still
+    has_target: { name: "LD2412 有人 Target", id: ld2412_target, on_press: [ - lambda: |- id(last_absence_seconds) = id(current_absence_seconds); ], on_release: [ - lambda: |- id(last_presence_seconds) = id(current_presence_seconds); ] }
+    has_moving_target: { name: "LD2412 微动 Moving", id: ld2412_moving }
+    has_still_target: { name: "LD2412 静止 Still", id: ld2412_still }
 
 status_led:
-  pin:
-    number: $led_pin
-    inverted: true
+  pin: { number: $led_pin, inverted: true }
 
 sensor:
   - platform: bl0940
     uart_id: uart_bl0940
-    voltage:
-      name: 'Voltage'
-      accuracy_decimals: 0
-    current:
-      name: 'Current'
-    power:
-      name: 'Power'
-      accuracy_decimals: 1
-    energy:
-      name: 'Energy'
-      accuracy_decimals: 3
-      id: bl0940_energy
+    voltage: { name: 'Voltage', accuracy_decimals: 0 }
+    current: { name: 'Current' }
+    power: { name: 'Power', accuracy_decimals: 1 }
+    energy: { name: 'Energy', accuracy_decimals: 3, id: bl0940_energy }
     read_command: 0x58
     write_command: 0xA8
     legacy_mode: false
     resistor_one: 0.51
     resistor_two: 1950
     update_interval: 1s
-
   - platform: template
     name: "Total Daily Energy"
     id: bl0940_DailyEnergy
@@ -229,63 +214,41 @@ sensor:
         id(var_energy) = id(bl0940_energy).state;
       }
       return id(bl0940_energy).state - id(var_energy);
-
   - platform: ld2412
-    moving_distance:
-      name: "LD2412 运动距离 MDist"
-      id: ld2412_moving_dist
-    still_distance:
-      name: "LD2412 静止距离 SDist"
-      id: ld2412_still_dist
-    moving_energy:
-      name: "LD2412 运动能量 MEnergy"
-      id: ld2412_moving_energy
-    still_energy:
-      name: "LD2412 静止能量 SEnergy"
-      id: ld2412_still_energy
-    detection_distance:
-      name: "LD2412 检测距离 Det"
-      id: ld2412_det_dist
-    light:
-      name: "LD2412 光照度 Lux"
-      id: ld2412_light
-
+    moving_distance: { name: "LD2412 运动距离 MDist", id: ld2412_moving_dist }
+    still_distance: { name: "LD2412 静止距离 SDist", id: ld2412_still_dist }
+    moving_energy: { name: "LD2412 运动能量 MEnergy", id: ld2412_moving_energy }
+    still_energy: { name: "LD2412 静止能量 SEnergy", id: ld2412_still_energy }
+    detection_distance: { name: "LD2412 检测距离 Det", id: ld2412_det_dist }
+    light: { name: "LD2412 光照度 Lux", id: ld2412_light }
   - platform: template
     name: "当前有人时长 P_Curr"
     id: sensor_curr_presence
     unit_of_measurement: "s"
     accuracy_decimals: 0
-    lambda: |-
-      return id(current_presence_seconds);
+    lambda: |- return id(current_presence_seconds);
     update_interval: 1s
-
   - platform: template
     name: "上次有人时长 P_Last"
     id: sensor_last_presence
     unit_of_measurement: "s"
     accuracy_decimals: 0
-    lambda: |-
-      return id(last_presence_seconds);
+    lambda: |- return id(last_presence_seconds);
     update_interval: 5s
-
   - platform: template
     name: "当前无人时长 A_Curr"
     id: sensor_curr_absence
     unit_of_measurement: "s"
     accuracy_decimals: 0
-    lambda: |-
-      return id(current_absence_seconds);
+    lambda: |- return id(current_absence_seconds);
     update_interval: 1s
-
   - platform: template
     name: "上次无人时长 A_Last"
     id: sensor_last_absence
     unit_of_measurement: "s"
     accuracy_decimals: 0
-    lambda: |-
-      return id(last_absence_seconds);
+    lambda: |- return id(last_absence_seconds);
     update_interval: 5s
-
   - platform: wifi_signal
     name: "WiFi RSSI"
     id: sensor_wifi_rssi
@@ -300,20 +263,94 @@ number:
     voltage_calibration: { name: Voltage Calibration }
     power_calibration: { name: Power Calibration }
     energy_calibration: { name: Energy Calibration }
-
   - platform: ld2412
-    timeout: 
-      name: "LD2412 存在超时 Timeout"
-      id: ld2412_timeout
-    min_distance_gate: 
-      name: "LD2412 最小距离门 MinGate"
-      id: ld2412_min_gate
-    max_distance_gate: 
-      name: "LD2412 最大距离门 MaxGate"
-      id: ld2412_max_gate
-    light_threshold: 
-      name: "LD2412 光照阈值 Thresh"
-      id: ld2412_light_thresh
+    timeout: { name: "LD2412 存在超时 Timeout", id: ld2412_timeout }
+    min_distance_gate: { name: "LD2412 最小距离门 MinGate", id: ld2412_min_gate }
+    max_distance_gate: { name: "LD2412 最大距离门 MaxGate", id: ld2412_max_gate }
+    light_threshold: { name: "LD2412 光照阈值 Thresh", id: ld2412_light_thresh }
+
+  # --- Dev1/Dev2 亮度与色温控制 ---
+  - platform: template
+    name: "Dev1 Light Brightness"
+    id: dev1_light_brightness_ctrl
+    min_value: 0
+    max_value: 100
+    step: 1
+    optimistic: true
+    set_action:
+      - lambda: |-
+          uint8_t brt = (uint8_t)x;
+          id(pkt_1) = {0xAA, 0x03, 0xCD, 0xAB, 0x38, 0x70, brt, 0x00}; 
+          id(pkt_2) = {0xAA, 0x04, 0xCD, 0xAB, 0x38, 0x70, brt, 0x00};
+      - script.execute: ble_send
+
+  - platform: template
+    name: "Dev1 Light Color Temp"
+    id: dev1_light_color_temp_ctrl
+    min_value: 0
+    max_value: 100
+    step: 1
+    optimistic: true
+    set_action:
+      - lambda: |-
+          uint8_t temp = (uint8_t)x;
+          id(pkt_1) = {0xAA, 0x05, 0xCD, 0xAB, 0x38, 0x70, temp, 0x00};
+          id(pkt_2) = {0xAA, 0x06, 0xCD, 0xAB, 0x38, 0x70, temp, 0x00};
+      - script.execute: ble_send
+
+  - platform: template
+    name: "Dev2 Light Brightness"
+    id: dev2_light_brightness_ctrl
+    min_value: 0
+    max_value: 100
+    step: 1
+    optimistic: true
+    set_action:
+      - lambda: |-
+          uint8_t brt = (uint8_t)x;
+          id(pkt_1) = {0xAA, 0x03, 0x92, 0x26, 0x35, 0x70, brt, 0x00}; 
+          id(pkt_2) = {0xAA, 0x04, 0x92, 0x26, 0x35, 0x70, brt, 0x00};
+      - script.execute: ble_send
+
+  - platform: template
+    name: "Dev2 Light Color Temp"
+    id: dev2_light_color_temp_ctrl
+    min_value: 0
+    max_value: 100
+    step: 1
+    optimistic: true
+    set_action:
+      - lambda: |-
+          uint8_t temp = (uint8_t)x;
+          id(pkt_1) = {0xAA, 0x05, 0x92, 0x26, 0x35, 0x70, temp, 0x00};
+          id(pkt_2) = {0xAA, 0x06, 0x92, 0x26, 0x35, 0x70, temp, 0x00};
+      - script.execute: ble_send
+
+select:
+  # --- Dev1/Dev2 风速选择 ---
+  - platform: template
+    name: "Dev1 Fan Speed Select"
+    id: dev1_fan_speed_ctrl
+    optimistic: true
+    options: ["1", "2", "3", "4", "5", "6"]
+    set_action:
+      - lambda: |-
+          uint8_t speed = std::stoi(x.c_str());
+          id(pkt_1) = {0xAA, 0x07, 0xCD, 0xAB, 0x38, 0x70, speed, 0x00};
+          id(pkt_2) = {0xAA, 0x08, 0xCD, 0xAB, 0x38, 0x70, speed, 0x00};
+      - script.execute: ble_send
+
+  - platform: template
+    name: "Dev2 Fan Speed Select"
+    id: dev2_fan_speed_ctrl
+    optimistic: true
+    options: ["1", "2", "3", "4", "5", "6"]
+    set_action:
+      - lambda: |-
+          uint8_t speed = std::stoi(x.c_str());
+          id(pkt_1) = {0xAA, 0x07, 0x92, 0x26, 0x35, 0x70, speed, 0x00};
+          id(pkt_2) = {0xAA, 0x08, 0x92, 0x26, 0x35, 0x70, speed, 0x00};
+      - script.execute: ble_send
 
 time:
   - platform: homeassistant
@@ -322,8 +359,7 @@ time:
       - seconds: 0
         minutes: 0
         hours: 0
-        then:
-          - lambda: id(var_energy) = id(bl0940_energy).state;
+        then: [ - lambda: id(var_energy) = id(bl0940_energy).state; ]
 
 button:
   - platform: bl0940
@@ -332,35 +368,53 @@ button:
     name: Factory Reset
     internal: True
     id: btn_factory_reset
-    
   - platform: ld2412
-    factory_reset: 
-      name: "LD2412 恢复出厂 Reset"
-      id: ld2412_factory_reset
-    restart: 
-      name: "LD2412 重启雷达 Restart"
-      id: ld2412_restart
-    query_params: 
-      name: "LD2412 查询参数 Query"
-      id: ld2412_query
+    factory_reset: { name: "LD2412 恢复出厂 Reset", id: ld2412_factory_reset }
+    restart: { name: "LD2412 重启雷达 Restart", id: ld2412_restart }
+    query_params: { name: "LD2412 查询参数 Query", id: ld2412_query }
+
+  # --- Dev1/Dev2 风扇反转控制 ---
+  - platform: template
+    name: "Dev1 Fan Reverse"
+    id: dev1_fan_reverse_ctrl
+    on_press:
+      - lambda: |-
+          id(pkt_1) = {0xAA, 0x09, 0xCD, 0xAB, 0x38, 0x70, 0x01, 0x00};
+          id(pkt_2) = {0xAA, 0x0A, 0xCD, 0xAB, 0x38, 0x70, 0x01, 0x00};
+      - script.execute: ble_send
+
+  - platform: template
+    name: "Dev2 Fan Reverse"
+    id: dev2_fan_reverse_ctrl
+    on_press:
+      - lambda: |-
+          id(pkt_1) = {0xAA, 0x09, 0x92, 0x26, 0x35, 0x70, 0x01, 0x00};
+          id(pkt_2) = {0xAA, 0x0A, 0x92, 0x26, 0x35, 0x70, 0x01, 0x00};
+      - script.execute: ble_send
 
 text_sensor:
   - platform: ld2412
-    version: 
-      name: "LD2412 固件版本 Ver"
-      id: ld2412_version
-    mac_address: 
-      name: "LD2412 MAC地址 MAC"
-      id: ld2412_mac
+    version: { name: "LD2412 固件版本 Ver", id: ld2412_version }
+    mac_address: { name: "LD2412 MAC地址 MAC", id: ld2412_mac }
   - platform: version
     name: "ESPHome Version"
+
+# --- BLE 发射专用脚本 ---
+script:
+  - id: ble_send
+    mode: restart
+    then:
+      - lambda: 'id(ble_server).set_manufacturer_data(id(pkt_1));'
+      - delay: 150ms
+      - lambda: 'id(ble_server).set_manufacturer_data(id(pkt_2));'
+      - delay: 50ms
+      - lambda: 'id(ble_server).set_manufacturer_data({});'
 
 interval:
   - interval: 1s
     then:
       - if:
-          condition:
-            binary_sensor.is_on: ld2412_target
+          condition: { binary_sensor.is_on: ld2412_target }
           then:
             - lambda: |-
                 id(current_presence_seconds)++;
@@ -369,13 +423,11 @@ interval:
             - lambda: |-
                 id(current_absence_seconds)++;
                 id(current_presence_seconds) = 0;
-
   - interval: 5min
     then:
       - if:
           condition:
-            lambda: |-
-              return isnan(id(ld2412_det_dist).state);
+            lambda: |- return isnan(id(ld2412_det_dist).state);
           then:
             - logger.log: "LD2412 Restart"
             - button.press: ld2412_restart
