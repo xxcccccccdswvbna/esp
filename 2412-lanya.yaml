@@ -29,34 +29,22 @@ esp32_ble_tracker:
   scan_parameters:
     interval: 1100ms
     window: 1100ms
-    active: true          # 保持主动扫描，确保能抓到风扇数据且支持代理功能
-  # 将抓包逻辑直接放在 tracker 下面
- # ... 在 esp32_ble_tracker 配置块内 ...
-    on_ble_advertise:
-      - mac_address: "00:00:70:38:AB:CD" # <--- 确保这是你风扇的MAC地址
-        then:
-          - lambda: |-
-              // 获取厂商自定义数据
-              auto data = x.get_manufacturer_data();
-              
-              // 将二进制数据转换为十六进制字符串
-              std::string hex_data = format_hex_pretty(data);
-              
-              // 【关键修改】移除所有空格和 "0x" 前缀，只保留纯十六进制字符
-              // 例如，将 "81 53 01..." 变为 "815301..."
-              hex_data.erase(std::remove(hex_data.begin(), hex_data.end(), ' '), hex_data.end());
-              hex_data.erase(std::remove(hex_data.begin(), hex_data.end(), '.'), hex_data.end());
+    active: true
+  on_ble_advertise:
+    - mac_address: "00:00:70:38:AB:CD"
+      then:
+        - lambda: |-
+            auto datas = x.get_manufacturer_datas();
+            if (datas.empty()) return;
+            auto &data = datas[0];
+            std::string hex_data = format_hex_pretty(data.data);
+            hex_data.erase(std::remove(hex_data.begin(), hex_data.end(), ' '), hex_data.end());
+            hex_data.erase(std::remove(hex_data.begin(), hex_data.end(), '.'), hex_data.end());
+            id(mqtt_client).publish("home/ble/custom_fan/raw", hex_data);
+            ESP_LOGD("ble_adv", "收到风扇数据: %s", hex_data.c_str());
 
-              // 发布纯十六进制字符串到 MQTT 主题
-              id(mqtt_client).publish("home/ble/custom_fan/raw", hex_data);
-              
-              // 打印日志方便调试
-              ESP_LOGD("ble_adv", "收到风扇数据: %s", hex_data.c_str());
-
-# 蓝牙代理配置保持不变
 bluetooth_proxy:
-  active: true 
-# ==========================================
+  active: true
 
 
 web_server:
