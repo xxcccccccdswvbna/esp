@@ -15,32 +15,24 @@ logger:
 api:
 
 # ==========================================
-# 新增：蓝牙网关 (Bluetooth Proxy) 配置
-# ==========================================
-esp32_ble_tracker:
-  scan_parameters:
-    # 优化扫描参数，提高发现周围蓝牙设备的概率并降低丢包率
-    interval: 1100ms
-    window: 1100ms
-    active: true
-
-bluetooth_proxy:
-  # active: true 允许 Home Assistant 主动连接需要绑定的设备（如小米温湿度计、蓝牙门锁等）。
-  # 如果遇到 ESP32 内存不足导致重启，可将其改为 false（仅接收广播数据）。
-  active: true 
-# ==========================================
 # 1. 配置 MQTT 连接
+# ==========================================
 mqtt:
   broker: "192.168.6.88"  # <--- 替换为你 Mosquitto 所在的宿主机 IP
   port: 1883
   id: mqtt_client         # 给 MQTT 客户端起个ID，方便后面调用
 
-# 2. 配置蓝牙扫描器
+# ==========================================
+# 2. 蓝牙网关与抓包合并配置
+# ==========================================
 esp32_ble_tracker:
   scan_parameters:
-    active: false         # 被动扫描即可，省电且抓取广播包速度快
+    interval: 1100ms
+    window: 1100ms
+    active: true          # 保持主动扫描，确保能抓到风扇数据且支持代理功能
+  # 将抓包逻辑直接放在 tracker 下面
   on_ble_advertise:
-    - mac_address: "00:00:70:38:AB:CD"  # <--- 替换为你目标风扇的真实 MAC 地址
+    - mac_address: "00:00:70:38:AB:CD"  # <--- 确认这是你目标风扇的真实 MAC 地址
       then:
         - lambda: |-
             // 获取厂商自定义数据
@@ -54,6 +46,12 @@ esp32_ble_tracker:
             
             // 打印日志方便调试
             ESP_LOGD("ble_adv", "收到风扇数据: %s", hex_data.c_str());
+
+# 蓝牙代理配置保持不变
+bluetooth_proxy:
+  active: true 
+# ==========================================
+
 
 web_server:
   port: 80
