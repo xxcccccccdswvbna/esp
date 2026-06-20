@@ -12,31 +12,37 @@ esp32:
     type: esp-idf
 
 logger:
+  level: INFO
+  # level: DEBUG  # 调试时取消注释
+
 api:
 
 # ==========================================
-# 1. 配置 MQTT 连接
+# 1. MQTT 连接配置
 # ==========================================
 mqtt:
-  broker: "192.168.6.88"  # <--- 替换为你 Mosquitto 所在的宿主机 IP
-  port: 1883
-  id: mqtt_client         # 给 MQTT 客户端起个ID，方便后面调用
+  broker: !secret mqtt_broker
+  port: !secret mqtt_port
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+  id: mqtt_client
 
 # ==========================================
-# 2. 蓝牙网关与抓包合并配置
+# 2. 蓝牙网关与抓包配置
 # ==========================================
 esp32_ble_tracker:
   scan_parameters:
-    interval: 1100ms
+    interval: 5000ms        # 降低扫描频率节省功耗
     window: 1100ms
-    active: true
+    active: false           # 被动扫描更省电
   on_ble_advertise:
-    - mac_address: "00:00:70:38:AB:CD"
+    - mac_address: !secret ble_fan_mac
       then:
         - lambda: |-
             auto datas = x.get_manufacturer_datas();
             if (datas.empty()) return;
             auto &data = datas[0];
+            if (data.data.empty()) return;
             std::string hex_data = format_hex_pretty(data.data);
             hex_data.erase(std::remove(hex_data.begin(), hex_data.end(), ' '), hex_data.end());
             hex_data.erase(std::remove(hex_data.begin(), hex_data.end(), '.'), hex_data.end());
@@ -46,28 +52,50 @@ esp32_ble_tracker:
 bluetooth_proxy:
   active: true
 
-
 web_server:
   port: 80
   version: 3
 
+# ==========================================
+# WiFi 配置
+# ==========================================
 wifi:
+  # 连接到主 WiFi 网络
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  
+  # 当无法连接主网络时启用热点模式
   ap:
     ssid: "SmartOutlet(V1) Hotspot"
-    password: "12345678"
+    password: !secret wifi_ap_password
 
 captive_portal:
 
+# ==========================================
+# 可配置参数
+# ==========================================
 substitutions:
+  # GPIO 脚位定义
   led_pin: GPIO27
   button_pin: GPIO0
   relay_a_pin: GPIO26
   relay_b_pin: GPIO25
-  ld2412_tx_pin: GPIO1  
-  ld2412_rx_pin: GPIO3  
+  ld2412_tx_pin: GPIO1
+  ld2412_rx_pin: GPIO3
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
+  
+  # BL0940 电能计量校准参数
+  bl0940_resistor_one: "0.51"
+  bl0940_resistor_two: "1950"
+  bl0940_update_interval: "1s"
+  
+  # BLE 扫描更新间隔
+  ble_scan_interval: "5000ms"
 
+# ==========================================
+# 全局变量
+# ==========================================
 globals:
   - id: var_energy
     type: float
@@ -90,36 +118,43 @@ globals:
     restore_value: yes
     initial_value: '0'
 
+# ==========================================
+# UART 串口配置
+# ==========================================
 uart:
   - id: uart_bl0940
     tx_pin: $bl0940_tx_pin
     rx_pin: $bl0940_rx_pin
     baud_rate: 4800
     stop_bits: 1
-    
+
   - id: uart_ld2412
     tx_pin: $ld2412_tx_pin
     rx_pin: $ld2412_rx_pin
-    baud_rate: 115200 
+    baud_rate: 115200
     parity: NONE
     stop_bits: 1
 
+# ==========================================
+# 输出配置 - 磁保持继电器
+# ==========================================
 output:
   - platform: gpio
     pin:
       number: $relay_a_pin
-      mode:
-        output: true
-        pulldown: true
+      mode: OUTPUT
+      pulldown: true
     id: relay_a_pin_output
   - platform: gpio
     pin:
       number: $relay_b_pin
-      mode:
-        output: true
-        pulldown: true
+      mode: OUTPUT
+      pulldown: true
     id: relay_b_pin_output
 
+# ==========================================
+# 开关配置
+# ==========================================
 switch:
   - platform: template
     name: "Switch"
@@ -150,6 +185,9 @@ switch:
       name: "LD2412 蓝牙控制 BT"
       id: ld2412_bluetooth
 
+# ==========================================
+# 二进制传感器配置
+# ==========================================
 binary_sensor:
   - platform: gpio
     pin:
@@ -161,16 +199,16 @@ binary_sensor:
     name: "button"
     internal: True
     on_click:
-    - min_length: 50ms
-      max_length: 350ms
-      then:
-        - if:
-            condition:
-              switch.is_on: outlet_switch
-            then:
-              - switch.turn_off: outlet_switch
-            else:
-              - switch.turn_on: outlet_switch
+      - min_length: 50ms
+        max_length: 350ms
+        then:
+          - if:
+              condition:
+                switch.is_on: outlet_switch
+              then:
+                - switch.turn_off: outlet_switch
+              else:
+                - switch.turn_on: outlet_switch
     on_multi_click:
       - timing:
           - ON for at least 10s
@@ -199,12 +237,19 @@ binary_sensor:
       name: "LD2412 静止 Still"
       id: ld2412_still
 
+# ==========================================
+# 状态指示灯
+# ==========================================
 status_led:
   pin:
     number: $led_pin
     inverted: true
 
+# ==========================================
+# 传感器配置
+# ==========================================
 sensor:
+  # BL0940 电能计量芯片
   - platform: bl0940
     uart_id: uart_bl0940
     voltage:
@@ -222,10 +267,11 @@ sensor:
     read_command: 0x58
     write_command: 0xA8
     legacy_mode: false
-    resistor_one: 0.51
-    resistor_two: 1950
-    update_interval: 1s
+    resistor_one: $bl0940_resistor_one
+    resistor_two: $bl0940_resistor_two
+    update_interval: $bl0940_update_interval
 
+  # 每日总电耗
   - platform: template
     name: "Total Daily Energy"
     id: bl0940_DailyEnergy
@@ -239,6 +285,7 @@ sensor:
       }
       return id(bl0940_energy).state - id(var_energy);
 
+  # LD2412 人体存在传感器
   - platform: ld2412
     moving_distance:
       name: "LD2412 运动距离 MDist"
@@ -259,71 +306,86 @@ sensor:
       name: "LD2412 光照度 Lux"
       id: ld2412_light
 
+  # 有人/无人时长统计
   - platform: template
     name: "当前有人时长 P_Curr"
     id: sensor_curr_presence
     unit_of_measurement: "s"
     accuracy_decimals: 0
+    update_interval: 1s
     lambda: |-
       return id(current_presence_seconds);
-    update_interval: 1s
 
   - platform: template
     name: "上次有人时长 P_Last"
     id: sensor_last_presence
     unit_of_measurement: "s"
     accuracy_decimals: 0
+    update_interval: 5s
     lambda: |-
       return id(last_presence_seconds);
-    update_interval: 5s
 
   - platform: template
     name: "当前无人时长 A_Curr"
     id: sensor_curr_absence
     unit_of_measurement: "s"
     accuracy_decimals: 0
+    update_interval: 1s
     lambda: |-
       return id(current_absence_seconds);
-    update_interval: 1s
 
   - platform: template
     name: "上次无人时长 A_Last"
     id: sensor_last_absence
     unit_of_measurement: "s"
     accuracy_decimals: 0
+    update_interval: 5s
     lambda: |-
       return id(last_absence_seconds);
-    update_interval: 5s
 
+  # WiFi 信号强度
   - platform: wifi_signal
     name: "WiFi RSSI"
     id: sensor_wifi_rssi
     update_interval: 60s
 
+# ==========================================
+# LD2412 雷达传感器配置
+# ==========================================
 ld2412:
   uart_id: uart_ld2412
 
+# ==========================================
+# 数值调节器配置
+# ==========================================
 number:
   - platform: bl0940
-    current_calibration: { name: Current Calibration }
-    voltage_calibration: { name: Voltage Calibration }
-    power_calibration: { name: Power Calibration }
-    energy_calibration: { name: Energy Calibration }
+    current_calibration:
+      name: Current Calibration
+    voltage_calibration:
+      name: Voltage Calibration
+    power_calibration:
+      name: Power Calibration
+    energy_calibration:
+      name: Energy Calibration
 
   - platform: ld2412
-    timeout: 
+    timeout:
       name: "LD2412 存在超时 Timeout"
       id: ld2412_timeout
-    min_distance_gate: 
+    min_distance_gate:
       name: "LD2412 最小距离门 MinGate"
       id: ld2412_min_gate
-    max_distance_gate: 
+    max_distance_gate:
       name: "LD2412 最大距离门 MaxGate"
       id: ld2412_max_gate
-    light_threshold: 
+    light_threshold:
       name: "LD2412 光照阈值 Thresh"
       id: ld2412_light_thresh
 
+# ==========================================
+# 时间配置
+# ==========================================
 time:
   - platform: homeassistant
     id: homeassistant_time
@@ -334,6 +396,9 @@ time:
         then:
           - lambda: id(var_energy) = id(bl0940_energy).state;
 
+# ==========================================
+# 按钮配置
+# ==========================================
 button:
   - platform: bl0940
     name: Reset Calibration
@@ -341,30 +406,37 @@ button:
     name: Factory Reset
     internal: True
     id: btn_factory_reset
-    
+
   - platform: ld2412
-    factory_reset: 
+    factory_reset:
       name: "LD2412 恢复出厂 Reset"
       id: ld2412_factory_reset
-    restart: 
+    restart:
       name: "LD2412 重启雷达 Restart"
       id: ld2412_restart
-    query_params: 
+    query_params:
       name: "LD2412 查询参数 Query"
       id: ld2412_query
 
+# ==========================================
+# 文本传感器配置
+# ==========================================
 text_sensor:
   - platform: ld2412
-    version: 
+    version:
       name: "LD2412 固件版本 Ver"
       id: ld2412_version
-    mac_address: 
+    mac_address:
       name: "LD2412 MAC地址 MAC"
       id: ld2412_mac
   - platform: version
     name: "ESPHome Version"
 
+# ==========================================
+# 定时任务
+# ==========================================
 interval:
+  # 每秒更新有人/无人时长
   - interval: 1s
     then:
       - if:
@@ -379,6 +451,7 @@ interval:
                 id(current_absence_seconds)++;
                 id(current_presence_seconds) = 0;
 
+  # 每5分钟检查LD2412是否离线，自动重启
   - interval: 5min
     then:
       - if:
@@ -386,5 +459,5 @@ interval:
             lambda: |-
               return isnan(id(ld2412_det_dist).state);
           then:
-            - logger.log: "LD2412 Restart"
+            - logger.log: "LD2412 离线，重启雷达"
             - button.press: ld2412_restart
