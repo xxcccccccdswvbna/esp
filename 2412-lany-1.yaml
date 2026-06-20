@@ -15,86 +15,27 @@ logger:
 api:
 
 # ==========================================
-# 新增：蓝牙网关与自定义 BLE 解析配置
+# 蓝牙射频底层配置 (纯粹的蓝牙网关/发射器)
 # ==========================================
 esp32_ble:
   io_capability: none
 
-# 1. 开启蓝牙代理，让 HA 能够直接连接设备
+# 1. 蓝牙代理 (核心：让 HA 能够通过此 ESP32 发射控制信号给灯具)
 bluetooth_proxy:
   active: true
   cache_services: true
 
-# 2. 保留 ble_server，确保编译通过
+# 2. 蓝牙服务端 (保留基础配置)
 esp32_ble_server:
   id: ble_server
   manufacturer_data: []
 
-# 3. 优化扫描参数并保留 Dev1-Dev4 解析逻辑
+# 3. 蓝牙扫描 (仅保留基础扫描，彻底删除状态监听与解析逻辑)
 esp32_ble_tracker:
   scan_parameters:
     interval: 320ms
     window: 300ms
-    active: true  # 必须为 true，允许获取完整设备信息并转发给 HA
-
-  # 4. 完整保留你原有的 Dev1 - Dev4 解析逻辑 (被动监听)
-  on_ble_manufacturer_data_advertise:
-    # 1704 协议 (Dev1, Dev2)
-    - manufacturer_id: "06A8"
-      then:
-        - lambda: |-
-            if (x.size() < 20) return;
-            uint8_t mode = x[11];
-            bool light_on = (mode & 0xF0) != 0x00;
-            bool fan_on = (mode & 0x01) == 0x01;
-            uint16_t brt_raw = (x[14] << 8) | x[15];
-            int brt_pct = 0;
-            if (light_on) {
-              if (brt_raw == 0xFFFF || brt_raw == 0xFF7F) brt_pct = 100;
-              else brt_pct = (int)(brt_raw / 655.35);
-            }
-            uint8_t fan_gear_raw = x[19];
-            int fan_gear = fan_on ? (fan_gear_raw + 1) : 0;
-            
-            if (x[3]==0xCD && x[4]==0xAB && x[5]==0x38 && x[6]==0x70) {
-              id(dev1_power).publish_state(light_on);
-              id(dev1_fan_running).publish_state(fan_on);
-              id(dev1_fan_speed).publish_state(fan_gear);
-              id(dev1_brightness).publish_state(brt_pct);
-            }
-            else if (x[3]==0x92 && x[4]==0x26 && x[5]==0x35 && x[6]==0x70) {
-              id(dev2_power).publish_state(light_on);
-              id(dev2_fan_running).publish_state(fan_on);
-              id(dev2_fan_speed).publish_state(fan_gear);
-              id(dev2_brightness).publish_state(brt_pct);
-            }
-
-    # 134D 协议 (Dev3, Dev4)
-    - manufacturer_id: "134D"
-      then:
-        - lambda: |-
-            if (x.size() < 20) return;
-            if (x[0] != 0x21) return;
-            uint8_t mode = x[18];
-            bool light_on = (mode & 0xF0) != 0x00;
-            bool fan_on = (mode & 0x01) == 0x01;
-            uint8_t brt_raw = x[13];
-            int brt_pct = light_on ? (int)(brt_raw * 100 / 255) : 0;
-            uint8_t fan_gear_raw = x[19];
-            int fan_gear = fan_on ? (fan_gear_raw + 1) : 0;
-            
-            if (x[2]==0x48 && x[3]==0x80 && x[4]==0x27 && x[5]==0x70) {
-              id(dev3_power).publish_state(light_on);
-              id(dev3_fan_running).publish_state(fan_on);
-              id(dev3_fan_speed).publish_state(fan_gear);
-              id(dev3_brightness).publish_state(brt_pct);
-            }
-            else if (x[2]==0xF0 && x[3]==0xCF && x[4]==0x2D && x[5]==0x70) {
-              id(dev4_power).publish_state(light_on);
-              id(dev4_fan_running).publish_state(fan_on);
-              id(dev4_fan_speed).publish_state(fan_gear);
-              id(dev4_brightness).publish_state(brt_pct);
-            }
+    active: true  
 # ==========================================
 
 web_server:
@@ -201,7 +142,6 @@ switch:
       id: ld2412_bluetooth
 
 binary_sensor:
-  # --- 原有传感器 ---
   - platform: gpio
     pin:
       number: $button_pin
@@ -250,47 +190,12 @@ binary_sensor:
       name: "LD2412 静止 Still"
       id: ld2412_still
 
-  # --- 新增：Dev1 - Dev4 蓝牙解析传感器 ---
-  - platform: template
-    name: "Dev1 Light Power"
-    id: dev1_power
-    device_class: light
-  - platform: template
-    name: "Dev1 Fan Running"
-    id: dev1_fan_running
-    device_class: running
-  - platform: template
-    name: "Dev2 Light Power"
-    id: dev2_power
-    device_class: light
-  - platform: template
-    name: "Dev2 Fan Running"
-    id: dev2_fan_running
-    device_class: running
-  - platform: template
-    name: "Dev3 Light Power"
-    id: dev3_power
-    device_class: light
-  - platform: template
-    name: "Dev3 Fan Running"
-    id: dev3_fan_running
-    device_class: running
-  - platform: template
-    name: "Dev4 Light Power"
-    id: dev4_power
-    device_class: light
-  - platform: template
-    name: "Dev4 Fan Running"
-    id: dev4_fan_running
-    device_class: running
-
 status_led:
   pin:
     number: $led_pin
     inverted: true
 
 sensor:
-  # --- 原有传感器 ---
   - platform: bl0940
     uart_id: uart_bl0940
     voltage:
@@ -385,48 +290,6 @@ sensor:
     name: "WiFi RSSI"
     id: sensor_wifi_rssi
     update_interval: 60s
-
-  # --- 新增：Dev1 - Dev4 蓝牙解析传感器 ---
-  - platform: template
-    name: "Dev1 Brightness"
-    id: dev1_brightness
-    unit_of_measurement: "%"
-    accuracy_decimals: 0
-  - platform: template
-    name: "Dev1 Fan Speed"
-    id: dev1_fan_speed
-    unit_of_measurement: "档"
-    accuracy_decimals: 0
-  - platform: template
-    name: "Dev2 Brightness"
-    id: dev2_brightness
-    unit_of_measurement: "%"
-    accuracy_decimals: 0
-  - platform: template
-    name: "Dev2 Fan Speed"
-    id: dev2_fan_speed
-    unit_of_measurement: "档"
-    accuracy_decimals: 0
-  - platform: template
-    name: "Dev3 Brightness"
-    id: dev3_brightness
-    unit_of_measurement: "%"
-    accuracy_decimals: 0
-  - platform: template
-    name: "Dev3 Fan Speed"
-    id: dev3_fan_speed
-    unit_of_measurement: "档"
-    accuracy_decimals: 0
-  - platform: template
-    name: "Dev4 Brightness"
-    id: dev4_brightness
-    unit_of_measurement: "%"
-    accuracy_decimals: 0
-  - platform: template
-    name: "Dev4 Fan Speed"
-    id: dev4_fan_speed
-    unit_of_measurement: "档"
-    accuracy_decimals: 0
 
 ld2412:
   uart_id: uart_ld2412
