@@ -61,8 +61,8 @@ substitutions:
   button_pin: GPIO0
   relay_a_pin: GPIO26
   relay_b_pin: GPIO25
-  ld2412_tx_pin: GPIO1  
-  ld2412_rx_pin: GPIO3  
+  ld2412_tx_pin: GPI03  
+  ld2412_rx_pin: GPIO1  
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
 
