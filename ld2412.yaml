@@ -31,7 +31,7 @@ substitutions:
   relay_a_pin: GPIO26
   relay_b_pin: GPIO25
   # 👇 修改这里：ESP32的TX是GPIO3，RX是GPIO1
-  ld2412_tx_pin: GPIO31   # <--- 改成 GPIO3
+  ld2412_tx_pin: GPIO1   # <--- 改成 GPIO3
   ld2412_rx_pin: GPIO3   # <--- 改成 GPIO1
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
