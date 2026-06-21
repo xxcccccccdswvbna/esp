@@ -6,13 +6,17 @@ esphome:
     name: "HA-DIYer.SmarOutlet-V1"
     version: "1.1.3"
 
+# 👇 核心修改 1：引入 software_uart 外部组件
+external_components:
+  - source: github://oxan/esphome-software-uart
+    components: [software_uart]
+
 esp32:
   board: esp32dev
   framework:
     type: esp-idf
 
-# ⚠️ 核心修改 1：关闭串口日志输出，释放 UART0 给雷达使用
-# 否则雷达通信数据会与日志输出发生严重冲突导致无法工作
+# 👇 核心修改 2：必须关闭串口日志，释放 UART0 给雷达使用
 logger:
   baud_rate: 0  
 
@@ -34,11 +38,6 @@ substitutions:
   button_pin: GPIO0
   relay_a_pin: GPIO26
   relay_b_pin: GPIO25
-  # ⚠️ 核心修改 2：针对硬件 TX-TX / RX-RX 接反的补救
-  # 物理上 ESP32 TX(GPIO3) 连了雷达 TX，这里软件上把 GPIO3 当作 RX 接收
-  # 物理上 ESP32 RX(GPIO1) 连了雷达 RX，这里软件上把 GPIO1 当作 TX 发送
-  ld2412_tx_pin: GPIO1   
-  ld2412_rx_pin: GPIO3   
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
 
@@ -70,13 +69,13 @@ uart:
     rx_pin: $bl0940_rx_pin
     baud_rate: 4800
     stop_bits: 1
-    
-  - id: uart_ld2412
-    tx_pin: $ld2412_tx_pin
-    rx_pin: $ld2412_rx_pin
-    baud_rate: 115200 
-    parity: NONE
-    stop_bits: 1
+
+# 👇 核心修改 3：使用软件串口替代硬件串口，实现引脚反转
+software_uart:
+  id: sw_uart_ld2412
+  rx_pin: GPIO3  # 物理上连了雷达的TX，这里在软件里当做RX接收
+  tx_pin: GPIO1  # 物理上连了雷达的RX，这里在软件里当做TX发送
+  baud_rate: 115200
 
 output:
   - platform: gpio
@@ -275,7 +274,7 @@ sensor:
     update_interval: 60s
 
 ld2412:
-  uart_id: uart_ld2412
+  uart_id: sw_uart_ld2412  # 👈 指向新定义的软件串口
 
 number:
   - platform: bl0940
