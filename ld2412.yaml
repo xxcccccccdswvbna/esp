@@ -37,8 +37,8 @@ substitutions:
   # ⚠️ 核心修改 2：针对硬件 TX-TX / RX-RX 接反的补救
   # 物理上 ESP32 TX(GPIO3) 连了雷达 TX，这里软件上把 GPIO3 当作 RX 接收
   # 物理上 ESP32 RX(GPIO1) 连了雷达 RX，这里软件上把 GPIO1 当作 TX 发送
-  ld2412_tx_pin: GPIO3   
-  ld2412_rx_pin: GPIO1   
+  ld2412_tx_pin: GPIO1   
+  ld2412_rx_pin: GPIO3   
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
 
