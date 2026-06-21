@@ -68,8 +68,8 @@ uart:
 # ⚠️ 核心修改 2：使用内置的 software_uart 替代硬件串口，实现引脚反转
 software_uart:
   id: sw_uart_ld2412
-  rx_pin: GPIO3  # 物理上连了雷达的TX，这里在软件里当做RX接收
-  tx_pin: GPIO1  # 物理上连了雷达的RX，这里在软件里当做TX发送
+  rx_pin: GPIO1  # 物理上连了雷达的TX，这里在软件里当做RX接收
+  tx_pin: GPIO3  # 物理上连了雷达的RX，这里在软件里当做TX发送
   baud_rate: 115200
 
 output:
