@@ -12,7 +12,6 @@ esp32:
     type: esp-idf
 
 logger:
-  baud_rate: 0  # <--- 添加这一行！彻底关闭 USB 串口日志，把 GPIO1/3 让给雷达
 api:
 
 web_server:
@@ -32,8 +31,8 @@ substitutions:
   relay_a_pin: GPIO26
   relay_b_pin: GPIO25
   # 👇 修改这里：ESP32的TX是GPIO3，RX是GPIO1
-  ld2412_tx_pin: GPIO3   # <--- 改成 GPIO3
-  ld2412_rx_pin: GPIO1   # <--- 改成 GPIO1
+  ld2412_tx_pin: GPIO31   # <--- 改成 GPIO3
+  ld2412_rx_pin: GPIO3   # <--- 改成 GPIO1
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
 
