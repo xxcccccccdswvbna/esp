@@ -1,0 +1,23 @@
+esphome:
+  name: relay-test
+
+esp32:
+  board: esp32-c3-devkitm-1
+
+logger:
+
+wifi:
+  ssid: "CC"
+  password: "chen1122"
+
+api:
+
+web_server:
+  port: 80
+  version: 3
+
+switch:
+  - platform: gpio
+    name: "Relay"
+    pin:
+      number: GPIO4
