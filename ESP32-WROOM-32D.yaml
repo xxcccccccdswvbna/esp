@@ -1,0 +1,30 @@
+esphome:
+  name: relay-test
+
+# 修改这里：将 board 改为 esp32dev
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino  # WROOM-32D 通常使用 Arduino 框架，更稳定兼容
+
+logger:
+
+wifi:
+  ssid: "CC"
+  password: "chen1122"
+
+api:
+  encryption:
+    key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
+
+web_server:
+  port: 80
+  version: 3
+
+switch:
+  - platform: gpio
+    name: "Relay"
+    pin:
+      number: GPIO4
+      # 注意：ESP32-WROOM-32D 的 GPIO4 是可用引脚，但请确保你的硬件继电器确实接在 GPIO4 上。
+      # 如果继电器模块是低电平触发，可能需要添加 inverted: true
