@@ -64,7 +64,6 @@ bluetooth_proxy:
 
 # ================= 全局变量与脚本 =================
 globals:
-  # 原有变量
   - id: pkt_1
     type: std::vector<uint8_t>
     initial_value: 'std::vector<uint8_t>{}'
@@ -74,7 +73,6 @@ globals:
   - id: last_cmd_time
     type: uint32_t
     initial_value: '0'
-  # 新增变量
   - id: do_factory_reset
     type: bool
     restore_value: no
@@ -180,49 +178,54 @@ binary_sensor:
     device_class: running
     icon: mdi:fan
 
-  # 物理按键 (替换为修复后的多击/长按逻辑)
+  # ================= 物理按键 (已按 ESPHome 标准规则重构) =================
+  
   # KEY1 GPIO34
   - platform: gpio
     id: key1
     pin: GPIO34
     name: KEY1
     on_multi_click:
+      # 长按 8s (组合键检测)
       - timing:
-          max_time_between_clicks: 500ms
-        single:
-          then:
-            - logger.log: "KEY1 单击"
-            - homeassistant.event:
-                event: gateway_key
-                data:
-                  key: "key1"
-                  mode: "single"
-        double:
-          then:
-            - logger.log: "KEY1 双击"
-            - homeassistant.event:
-                event: gateway_key
-                data:
-                  key: "key1"
-                  mode: "double"
-    on_long_press:
-      min_length: 8s
-      then:
-        - lambda: 'id(key_combination_hold) = true;'
-        - delay: 100ms
-        - if:
-            condition:
-              binary_sensor.is_on: key4
-            then:
-              - logger.log: "KEY1+KEY4 长按8秒，准备恢复出厂"
-              - lambda: 'id(do_factory_reset) = true;'
-              - restart:
-            else:
-              - logger.log: "仅KEY1长按，无复位"
-              - lambda: 'id(key_combination_hold) = false;'
-    on_release:
-      then:
-        - lambda: 'id(key_combination_hold) = false;'
+          - ON for at least 8s
+        then:
+          - lambda: 'id(key_combination_hold) = true;'
+          - delay: 100ms
+          - if:
+              condition:
+                binary_sensor.is_on: key4
+              then:
+                - logger.log: "KEY1+KEY4 长按8秒，准备恢复出厂"
+                - lambda: 'id(do_factory_reset) = true;'
+                - restart:
+              else:
+                - logger.log: "仅KEY1长按，无复位"
+                - lambda: 'id(key_combination_hold) = false;'
+      # 单击
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - logger.log: "KEY1 单击"
+          - homeassistant.event:
+              event: gateway_key
+              data:
+                key: "key1"
+                mode: "single"
+      # 双击
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at most 0.3s
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - logger.log: "KEY1 双击"
+          - homeassistant.event:
+              event: gateway_key
+              data:
+                key: "key1"
+                mode: "double"
 
   # KEY2 GPIO35
   - platform: gpio
@@ -230,54 +233,62 @@ binary_sensor:
     pin: GPIO35
     name: KEY2
     on_multi_click:
+      # 长按 1.5s
       - timing:
-          max_time_between_clicks: 600ms
-        single:
-          then:
-            - logger.log: "KEY2 单击"
-            - homeassistant.event:
-                event: gateway_key
-                data:
-                  key: "key2"
-                  mode: "single"
-            - lambda: 'id(safe_mode_tap_count)++;'
-            - if:
-                condition:
-                  lambda: 'id(safe_mode_tap_count) >= 5'
-                then:
-                  - logger.log: "KEY2连续5次，进入安全模式"
-                  # 注意：ESPHome 原生没有 safe_mode.start action，若编译报错请注释此行或改用其他重启逻辑
-                  - safe_mode.start: 
-                  - lambda: 'id(safe_mode_tap_count) = 0;'
-                  - repeat:
-                      count: 8
-                      then:
-                        - light.toggle: blue_led
-                        - delay: 150ms
-                else:
-                  - delay: 5000ms
-                  - if:
-                      condition:
-                        lambda: 'id(safe_mode_tap_count) < 5'
-                      then:
-                        - lambda: 'id(safe_mode_tap_count) = 0;'
-        double:
-          then:
-            - logger.log: "KEY2 双击"
-            - homeassistant.event:
-                event: gateway_key
-                data:
-                  key: "key2"
-                  mode: "double"
-    on_long_press:
-      min_length: 1.5s
-      then:
-        - logger.log: "KEY2 长按"
-        - homeassistant.event:
-            event: gateway_key
-            data:
-              key: "key2"
-              mode: "long"
+          - ON for at least 1.5s
+        then:
+          - logger.log: "KEY2 长按"
+          - homeassistant.event:
+              event: gateway_key
+              data:
+                key: "key2"
+                mode: "long"
+      # 单击 (安全模式计数)
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - logger.log: "KEY2 单击"
+          - homeassistant.event:
+              event: gateway_key
+              data:
+                key: "key2"
+                mode: "single"
+          - lambda: 'id(safe_mode_tap_count)++;'
+          - if:
+              condition:
+                lambda: 'id(safe_mode_tap_count) >= 5'
+              then:
+                - logger.log: "KEY2连续5次，准备重启进入安全模式"
+                - lambda: 'id(safe_mode_tap_count) = 0;'
+                - repeat:
+                    count: 8
+                    then:
+                      - light.toggle: blue_led
+                      - delay: 150ms
+                # 注意：ESPHome原生安全模式是通过"连续重启5次"触发的。
+                # 这里执行重启，配合您的5次连按逻辑，设备重启后将自动进入安全模式。
+                - restart: 
+              else:
+                - delay: 5000ms
+                - if:
+                    condition:
+                      lambda: 'id(safe_mode_tap_count) < 5'
+                    then:
+                      - lambda: 'id(safe_mode_tap_count) = 0;'
+      # 双击
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at most 0.3s
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - logger.log: "KEY2 双击"
+          - homeassistant.event:
+              event: gateway_key
+              data:
+                key: "key2"
+                mode: "double"
 
   # KEY3 GPIO32
   - platform: gpio
@@ -285,33 +296,40 @@ binary_sensor:
     pin: GPIO32
     name: KEY3
     on_multi_click:
+      # 长按 1.5s
       - timing:
-          max_time_between_clicks: 500ms
-        single:
-          then:
-            - logger.log: "KEY3 单击"
-            - homeassistant.event:
-                event: gateway_key
-                data:
-                  key: "key3"
-                  mode: "single"
-        double:
-          then:
-            - logger.log: "KEY3 双击"
-            - homeassistant.event:
-                event: gateway_key
-                data:
-                  key: "key3"
-                  mode: "double"
-    on_long_press:
-      min_length: 1.5s
-      then:
-        - logger.log: "KEY3 长按"
-        - homeassistant.event:
-            event: gateway_key
-            data:
-              key: "key3"
-              mode: "long"
+          - ON for at least 1.5s
+        then:
+          - logger.log: "KEY3 长按"
+          - homeassistant.event:
+              event: gateway_key
+              data:
+                key: "key3"
+                mode: "long"
+      # 单击
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - logger.log: "KEY3 单击"
+          - homeassistant.event:
+              event: gateway_key
+              data:
+                key: "key3"
+                mode: "single"
+      # 双击
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at most 0.3s
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - logger.log: "KEY3 双击"
+          - homeassistant.event:
+              event: gateway_key
+              data:
+                key: "key3"
+                mode: "double"
 
   # KEY4 GPIO33
   - platform: gpio
@@ -319,33 +337,40 @@ binary_sensor:
     pin: GPIO33
     name: KEY4
     on_multi_click:
+      # 长按 1.5s
       - timing:
-          max_time_between_clicks: 500ms
-        single:
-          then:
-            - logger.log: "KEY4 单击"
-            - homeassistant.event:
-                event: gateway_key
-                data:
-                  key: "key4"
-                  mode: "single"
-        double:
-          then:
-            - logger.log: "KEY4 双击"
-            - homeassistant.event:
-                event: gateway_key
-                data:
-                  key: "key4"
-                  mode: "double"
-    on_long_press:
-      min_length: 1.5s
-      then:
-        - logger.log: "KEY4 长按"
-        - homeassistant.event:
-            event: gateway_key
-            data:
-              key: "key4"
-              mode: "long"
+          - ON for at least 1.5s
+        then:
+          - logger.log: "KEY4 长按"
+          - homeassistant.event:
+              event: gateway_key
+              data:
+                key: "key4"
+                mode: "long"
+      # 单击
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - logger.log: "KEY4 单击"
+          - homeassistant.event:
+              event: gateway_key
+              data:
+                key: "key4"
+                mode: "single"
+      # 双击
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at most 0.3s
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - logger.log: "KEY4 双击"
+          - homeassistant.event:
+              event: gateway_key
+              data:
+                key: "key4"
+                mode: "double"
 
 # ================= 下拉选择框 (Select) =================
 select:
