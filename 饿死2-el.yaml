@@ -1,0 +1,363 @@
+# ==============================================================================
+# Yeelight Gateway V4 PRO 正式长期稳定固件
+# 硬件：ESP32-WROOM-32D 单核ESP-IDF
+# GPIO定义对照表
+# KEY1  GPIO34 | KEY2 GPIO35 | KEY3 GPIO32 | KEY4 GPIO33
+# BLUE_LED GPIO27 | WHITE_LED GPIO26
+# 功能：蓝牙代理/BLE Tracker、4键单击/双击/长按、状态指示灯、出厂复位、安全模式、OTA、WebAPI、WiFi信号/运行时长
+# ==============================================================================
+esphome:
+  name: yeelight-gateway-v4
+  friendly_name: Yeelight Gateway V4 PRO
+  comment: "V4正式稳定版，长期生产使用，单核ESP-IDF优化"
+  # 恢复出厂触发钩子
+  on_boot:
+    priority: -100
+    then:
+      - if:
+          condition:
+            lambda: 'return id(factory_reset_flag);'
+          then:
+            - logger.log: "触发出厂恢复，清空所有配置"
+            - light.turn_on: white_led
+            - delay: 2000
+            - light.turn_off: white_led
+            - factory_reset:
+  # 安全模式启动提示
+  on_safe_mode:
+    then:
+      - logger.log: "设备进入安全模式，蓝牙代理暂停，仅保留WiFi/网页/OTA"
+      - repeat:
+          count: 6
+          then:
+            - light.toggle: blue_led
+            - delay: 200
+
+esp32:
+  board: esp32dev
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+    # 强制单核运行，匹配WROOM-32D单核硬件规划
+    sdkconfig_options:
+      CONFIG_FREERTOS_UNICORE: y
+      CONFIG_BT_NIMBLE_TASK_STACK_SIZE: 3072
+      CONFIG_BT_SCAN_RESULT_QUEUE_LEN: 24
+
+# 全局日志优化，减少冗余输出
+logger:
+  level: INFO
+  baud_rate: 115200
+  logs:
+    esp32_ble_tracker: WARN
+    bluetooth_proxy: INFO
+
+# HA API接入
+api:
+  encryption:
+    key: "自动生成，首次烧录后在HA页面复制替换"
+  reboot_timeout: 15min
+
+# OTA在线升级
+ota:
+  platform: esphome
+  password: "gateway_v4_ota_secure"
+  on_begin:
+    then:
+      # OTA升级白灯快闪提示
+      - light.turn_on: white_led
+      - light.blink:
+          id: white_led
+          period: 150ms
+  on_progress:
+    then:
+      - logger.log: "OTA升级进度 %0.1f%%", progress
+  on_end:
+    then:
+      - light.turn_off: white_led
+  on_error:
+    then:
+      - repeat:
+          count: 10
+          then:
+            - light.toggle: white_led
+            - delay: 100
+      - light.turn_off: white_led
+
+# WiFi配置
+wifi:
+  ssid: "CC"
+  password: "chen1122"
+  fast_connect: true
+  power_save: none
+  domain: ".local"
+  # WiFi断开状态：蓝灯慢闪
+  on_disconnect:
+    then:
+      - light.blink:
+          id: blue_led
+          period: 1000ms
+  # WiFi连接成功：蓝灯常亮等待HA连接
+  on_connect:
+    then:
+      - light.turn_on: blue_led
+  # WiFi重连失败提示
+  on_reconnect:
+    then:
+      - logger.log: "WiFi重连中"
+
+# 配网门户
+captive_portal:
+
+# 内置Web管理面板+HTTP API
+web_server:
+  port: 80
+  auth:
+    username: admin
+    password: gateway_v4_web
+
+# 蓝牙底层扫描优化
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1100ms
+    window: 300ms
+    active: true
+  on_ble_advertise:
+    then:
+      - lambda: |-
+          if (x.get_rssi() > -70) {
+            ESP_LOGV("BLE", "近距离设备 %s RSSI:%d", x.address_str().c_str(), x.get_rssi());
+          }
+
+# Home Assistant 蓝牙代理
+bluetooth_proxy:
+  active: true
+  cache_services: true
+  on_connected:
+    then:
+      # HA蓝牙连接稳定，保持蓝灯常亮
+      - light.turn_on: blue_led
+  on_disconnected:
+    then:
+      - light.blink:
+          id: blue_led
+          period: 1000ms
+
+# ---------------------- 传感器模块 ----------------------
+sensor:
+  # 设备运行时长
+  - platform: uptime
+    name: Uptime
+    update_interval: 60s
+  # WiFi信号强度RSSI
+  - platform: wifi_signal
+    name: WiFi RSSI
+    update_interval: 30s
+
+# 文本信息传感器
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: Device IP
+    ssid:
+      name: Connected SSID
+  - platform: version
+    name: Firmware Version
+
+# ---------------------- LED硬件输出定义 ----------------------
+output:
+  # 蓝色LED GPIO27 低电平点亮，反转输出
+  - platform: gpio
+    id: blue_led_out
+    pin:
+      number: GPIO27
+      inverted: true
+  # 白色LED GPIO26 低电平点亮，反转输出
+  - platform: gpio
+    id: white_led_out
+    pin:
+      number: GPIO26
+      inverted: true
+
+# HA灯光实体
+light:
+  - platform: binary
+    name: Blue LED
+    id: blue_led
+    output: blue_led_out
+    restore_mode: RESTORE_DEFAULT_OFF
+  - platform: binary
+    name: White LED
+    id: white_led
+    output: white_led_out
+    restore_mode: RESTORE_DEFAULT_OFF
+
+# ---------------------- 全局变量（复位/安全模式标记） ----------------------
+globals:
+  - id: factory_reset_flag
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: safe_mode_counter
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+# ---------------------- 物理按键配置 4键 单击/双击/长按 ----------------------
+binary_sensor:
+  # KEY1 GPIO34
+  - platform: gpio
+    id: key1
+    pin: GPIO34
+    name: KEY1
+    on_click:
+      # 单击事件
+      - single_click:
+          then:
+            - logger.log: "KEY1 单击触发"
+            - homeassistant.event:
+                event: gateway_key_event
+                data:
+                  key: "KEY1"
+                  action: "single"
+      # 双击事件
+      - multi_click:
+          max_click: 2
+          then:
+            - logger.log: "KEY1 双击触发"
+            - homeassistant.event:
+                event: gateway_key_event
+                data:
+                  key: "KEY1"
+                  action: "double"
+      # 长按8秒 判断出厂复位组合键 KEY1+KEY4
+      - long_press:
+          min_length: 8s
+          then:
+            - logger.log: "检测KEY1长按，等待KEY4确认复位"
+            - delay: 8000
+            - if:
+                condition:
+                  binary_sensor.is_on: key4
+                then:
+                  - lambda: 'id(factory_reset_flag) = true;'
+                  - restart:
+                else:
+                  - logger.log: "仅KEY1长按，无复位操作"
+  # KEY2 GPIO35
+  - platform: gpio
+    id: key2
+    pin: GPIO35
+    name: KEY2
+    on_click:
+      - single_click:
+          then:
+            - logger.log: "KEY2 单击触发"
+            - homeassistant.event:
+                event: gateway_key_event
+                data:
+                  key: "KEY2"
+                  action: "single"
+            # 安全模式计数+1
+            - lambda: 'id(safe_mode_counter) += 1;'
+            - if:
+                condition:
+                  lambda: 'return id(safe_mode_counter) >=5;'
+                then:
+                  - logger.log: "KEY2连续5次，进入安全模式"
+                  - safe_mode.start:
+                  - lambda: 'id(safe_mode_counter) = 0;'
+                else:
+                  - delay: 2000
+                  - lambda: 'id(safe_mode_counter) = 0;'
+      - multi_click:
+          max_click: 2
+          then:
+            - logger.log: "KEY2 双击触发"
+            - homeassistant.event:
+                event: gateway_key_event
+                data:
+                  key: "KEY2"
+                  action: "double"
+      - long_press:
+          min_length: 1.5s
+          then:
+            - logger.log: "KEY2 长按触发"
+            - homeassistant.event:
+                event: gateway_key_event
+                data:
+                  key: "KEY2"
+                  action: "long"
+  # KEY3 GPIO32
+  - platform: gpio
+    id: key3
+    pin: GPIO32
+    name: KEY3
+    on_click:
+      - single_click:
+          then:
+            - logger.log: "KEY3 单击触发"
+            - homeassistant.event:
+                event: gateway_key_event
+                data:
+                  key: "KEY3"
+                  action: "single"
+      - multi_click:
+          max_click: 2
+          then:
+            - logger.log: "KEY3 双击触发"
+            - homeassistant.event:
+                event: gateway_key_event
+                data:
+                  key: "KEY3"
+                  action: "double"
+      - long_press:
+          min_length: 1.5s
+          then:
+            - logger.log: "KEY3 长按触发"
+            - homeassistant.event:
+                event: gateway_key_event
+                data:
+                  key: "KEY3"
+                  action: "long"
+  # KEY4 GPIO33
+  - platform: gpio
+    id: key4
+    pin: GPIO33
+    name: KEY4
+    on_click:
+      - single_click:
+          then:
+            - logger.log: "KEY4 单击触发"
+            - homeassistant.event:
+                event: gateway_key_event
+                data:
+                  key: "KEY4"
+                  action: "single"
+      - multi_click:
+          max_click: 2
+          then:
+            - logger.log: "KEY4 双击触发"
+            - homeassistant.event:
+                event: gateway_key_event
+                data:
+                  key: "KEY4"
+                  action: "double"
+      - long_press:
+          min_length: 1.5s
+          then:
+            - logger.log: "KEY4 长按触发"
+            - homeassistant.event:
+                event: gateway_key_event
+                data:
+                  key: "KEY4"
+                  action: "long"
+
+# 系统控制按钮
+button:
+  # 设备重启按钮，HA实体
+  - platform: restart
+    name: Restart Gateway
+  # 强制出厂复位按钮（网页/HA一键复位备用）
+  - platform: factory_reset
+    name: Factory Reset Gateway
