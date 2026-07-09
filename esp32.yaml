@@ -1,0 +1,81 @@
+esphome:
+  name: esp32-single-core-test
+  friendly_name: "单核ESP32测试"
+  comment: "专用于测试单核ESP32芯片的简单固件"
+
+# ================= 核心配置：强制单核与4MB Flash =================
+esp32:
+  board: esp32dev
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+    # ⚠️ 关键：强制开启单核模式，解决单核芯片双核编译导致的崩溃
+    sdkconfig_options:
+      CONFIG_FREERTOS_UNICORE: y
+# =================================================================
+
+# 配置 Wi-Fi (请修改为您家的 Wi-Fi 信息)
+wifi:
+  ssid: "CC"
+  password: "chen1122"
+  
+  # 如果连不上，自动开启热点 (AP模式) 方便调试
+  ap:
+    ssid: "ESP32-Test-Fallback"
+    password: "12345678"
+
+# 开启 captive portal (方便在手机连上热点后直接配置)
+captive_portal:
+
+# 开启 Web 服务器 (端口 80)，方便在浏览器直接查看状态
+web_server:
+  port: 80
+
+# 开启 ESPHome API (如果以后要接入 Home Assistant)
+api:
+  encryption:
+    key: "自动生成或留空" # 如果不需要加密接入HA，可以删掉这两行
+
+# 开启 OTA 无线升级
+ota:
+  - platform: esphome
+    password: "chen1122"
+
+# 开启串口日志
+logger:
+  level: INFO
+
+# ================= 测试组件 =================
+
+# 1. 状态传感器 (验证系统是否在线)
+sensor:
+  - platform: uptime
+    name: "运行时间(秒)"
+    id: uptime_sensor
+
+  - platform: wifi_signal
+    name: "Wi-Fi信号强度"
+    id: wifi_signal_sensor
+    update_interval: 10s
+
+# 2. 文本传感器 (显示 Wi-Fi IP 和 BSSID)
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "设备IP地址"
+    ssid:
+      name: "连接的Wi-Fi"
+    mac_address:
+      name: "设备MAC地址"
+
+# 3. 开关组件 (验证 GPIO 和 系统控制)
+switch:
+  # 控制板载 LED (通常是 GPIO 2，如果您的板子没有LED或引脚不同，请修改 pin)
+  - platform: gpio
+    pin: GPIO2
+    name: "板载LED控制"
+    id: led_switch
+
+  # 提供一个重启按钮，验证系统控制指令是否正常
+  - platform: restart
+    name: "重启设备"
