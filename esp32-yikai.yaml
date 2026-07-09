@@ -178,13 +178,18 @@ binary_sensor:
     device_class: running
     icon: mdi:fan
 
-  # ================= 物理按键 =================
+  # ================= 物理按键 (已添加防抖与二次确认) =================
   
   # KEY1 GPIO34
   - platform: gpio
     id: key1
-    pin: GPIO34
     name: KEY1
+    pin:
+      number: GPIO34
+      inverted: true  # <--- 修复点：假设硬件按下接地。如果逻辑反了请去掉此行
+    filters:
+      - delayed_on: 20ms  # <--- 修复点：防抖滤波，过滤瞬间干扰
+      - delayed_off: 20ms
     on_multi_click:
       # 长按 8s (组合键检测)
       - timing:
@@ -196,9 +201,18 @@ binary_sensor:
               condition:
                 binary_sensor.is_on: key4
               then:
-                - logger.log: "KEY1+KEY4 长按8秒，准备恢复出厂"
-                - lambda: 'id(do_factory_reset) = true;'
-                - lambda: 'App.reboot();'
+                # <--- 修复点：二次确认，防止 KEY4 瞬间干扰导致误触发
+                - delay: 500ms
+                - if:
+                    condition:
+                      binary_sensor.is_on: key4
+                    then:
+                      - logger.log: "KEY1+KEY4 长按8秒，准备恢复出厂"
+                      - lambda: 'id(do_factory_reset) = true;'
+                      - lambda: 'App.reboot();'
+                    else:
+                      - logger.log: "KEY4 干扰已消失，取消恢复出厂"
+                      - lambda: 'id(key_combination_hold) = false;'
               else:
                 - logger.log: "仅KEY1长按，无复位"
                 - lambda: 'id(key_combination_hold) = false;'
@@ -230,8 +244,13 @@ binary_sensor:
   # KEY2 GPIO35
   - platform: gpio
     id: key2
-    pin: GPIO35
     name: KEY2
+    pin:
+      number: GPIO35
+      inverted: true
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 20ms
     on_multi_click:
       # 长按 1.5s
       - timing:
@@ -257,7 +276,6 @@ binary_sensor:
           - lambda: 'id(safe_mode_tap_count)++;'
           - if:
               condition:
-                # <--- 修复点 1：条件 Lambda 必须包含 return 语句
                 lambda: 'return id(safe_mode_tap_count) >= 5;'
               then:
                 - logger.log: "KEY2连续5次，准备重启进入安全模式"
@@ -270,7 +288,6 @@ binary_sensor:
                 - lambda: 'App.safe_reboot();' 
               else:
                 - delay: 5000ms
-                # <--- 优化点：去掉了原本多余的 if 判断，因为走到这里必然 < 5，直接清零即可
                 - lambda: 'id(safe_mode_tap_count) = 0;'
       # 双击
       - timing:
@@ -289,8 +306,13 @@ binary_sensor:
   # KEY3 GPIO32
   - platform: gpio
     id: key3
-    pin: GPIO32
     name: KEY3
+    pin:
+      number: GPIO32
+      inverted: true
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 20ms
     on_multi_click:
       # 长按 1.5s
       - timing:
@@ -330,8 +352,13 @@ binary_sensor:
   # KEY4 GPIO33
   - platform: gpio
     id: key4
-    pin: GPIO33
     name: KEY4
+    pin:
+      number: GPIO33
+      inverted: true
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 20ms
     on_multi_click:
       # 长按 1.5s
       - timing:
