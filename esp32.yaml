@@ -1,9 +1,6 @@
-substitutions:
-  test_gpio: "2"
-
 esphome:
-  name: yeelight-led-test
-  friendly_name: Yeelight LED Test
+  name: yeelight-gpio-pro
+  friendly_name: Yeelight GPIO Pro
 
 esp32:
   board: esp32dev
@@ -24,10 +21,13 @@ ota:
 wifi:
   ssid: "CC"
   password: "chen1122"
-
-web_server:
+  ap:
+    ssid: "Yeelight-Pro"
+    password: "12345678"
 
 captive_portal:
+
+web_server:
 
 sensor:
   - platform: uptime
@@ -38,7 +38,6 @@ text_sensor:
     ip_address:
       name: IP
 
-# 已确认的四个按键
 binary_sensor:
   - platform: gpio
     pin: GPIO34
@@ -64,12 +63,7 @@ binary_sensor:
     on_press:
       - logger.log: "KEY4"
 
-# ================= 所有的 output 定义 =================
 output:
-  - platform: gpio
-    id: test_output
-    pin:
-      number: GPIO${test_gpio}
   - platform: gpio
     id: gpio2
     pin: GPIO2
@@ -122,35 +116,9 @@ output:
     id: gpio27
     pin: GPIO27
 
-switch:
-  - platform: output
-    name: GPIO ${test_gpio}
-    output: test_output
-
-# ================= 所有的 button 定义 =================
-# ⚠️ 注意：name 中加入了数字，防止纯中文转换成下划线导致 ID 冲突
 button:
   - platform: template
-    name: "测试 GPIO"
-    id: btn_test_gpio
-    on_press:
-      - logger.log: "========== START TEST =========="
-      - output.turn_on: test_output
-      - delay: 1s
-      - output.turn_off: test_output
-      - delay: 300ms
-      - output.turn_on: test_output
-      - delay: 300ms
-      - output.turn_off: test_output
-      - delay: 300ms
-      - output.turn_on: test_output
-      - delay: 300ms
-      - output.turn_off: test_output
-      - logger.log: "========== END TEST =========="
-
-  - platform: template
-    name: "测试组 1"  # <--- 修改了名称，加入数字
-    id: btn_group_1
+    name: Test Group 1
     on_press:
       - output.turn_on: gpio2
       - delay: 800ms
@@ -166,8 +134,7 @@ button:
       - output.turn_off: gpio12
 
   - platform: template
-    name: "测试组 2"  # <--- 修改了名称，加入数字
-    id: btn_group_2
+    name: Test Group 2
     on_press:
       - output.turn_on: gpio13
       - delay: 800ms
@@ -183,8 +150,7 @@ button:
       - output.turn_off: gpio16
 
   - platform: template
-    name: "测试组 3"  # <--- 修改了名称，加入数字
-    id: btn_group_3
+    name: Test Group 3
     on_press:
       - output.turn_on: gpio17
       - delay: 800ms
@@ -200,8 +166,7 @@ button:
       - output.turn_off: gpio21
 
   - platform: template
-    name: "测试组 4"  # <--- 修改了名称，加入数字
-    id: btn_group_4
+    name: Test Group 4
     on_press:
       - output.turn_on: gpio22
       - delay: 800ms
@@ -217,9 +182,11 @@ button:
       - output.turn_off: gpio26
 
   - platform: template
-    name: "测试组 5"  # <--- 修改了名称，加入数字
-    id: btn_group_5
+    name: Test GPIO27
     on_press:
       - output.turn_on: gpio27
       - delay: 800ms
       - output.turn_off: gpio27
+
+  - platform: restart
+    name: Restart Device
