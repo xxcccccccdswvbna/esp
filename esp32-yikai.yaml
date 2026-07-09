@@ -178,7 +178,7 @@ binary_sensor:
     device_class: running
     icon: mdi:fan
 
-  # ================= 物理按键 (已使用底层 Lambda 修复重启动作) =================
+  # ================= 物理按键 (已修复事件名称规范) =================
   
   # KEY1 GPIO34
   - platform: gpio
@@ -198,8 +198,7 @@ binary_sensor:
               then:
                 - logger.log: "KEY1+KEY4 长按8秒，准备恢复出厂"
                 - lambda: 'id(do_factory_reset) = true;'
-                # <--- 修复点：使用底层 C++ 方法重启
-                - lambda: 'App.reboot();' 
+                - lambda: 'App.reboot();'
               else:
                 - logger.log: "仅KEY1长按，无复位"
                 - lambda: 'id(key_combination_hold) = false;'
@@ -210,7 +209,7 @@ binary_sensor:
         then:
           - logger.log: "KEY1 单击"
           - homeassistant.event:
-              event: gateway_key
+              event: esphome.gateway_key  # <--- 修复点：加上 esphome. 前缀
               data:
                 key: "key1"
                 mode: "single"
@@ -223,7 +222,7 @@ binary_sensor:
         then:
           - logger.log: "KEY1 双击"
           - homeassistant.event:
-              event: gateway_key
+              event: esphome.gateway_key  # <--- 修复点
               data:
                 key: "key1"
                 mode: "double"
@@ -240,7 +239,7 @@ binary_sensor:
         then:
           - logger.log: "KEY2 长按"
           - homeassistant.event:
-              event: gateway_key
+              event: esphome.gateway_key  # <--- 修复点
               data:
                 key: "key2"
                 mode: "long"
@@ -251,7 +250,7 @@ binary_sensor:
         then:
           - logger.log: "KEY2 单击"
           - homeassistant.event:
-              event: gateway_key
+              event: esphome.gateway_key  # <--- 修复点
               data:
                 key: "key2"
                 mode: "single"
@@ -267,7 +266,6 @@ binary_sensor:
                     then:
                       - light.toggle: blue_led
                       - delay: 150ms
-                # <--- 修复点：使用底层 C++ 方法进入安全模式并重启
                 - lambda: 'App.safe_reboot();' 
               else:
                 - delay: 5000ms
@@ -285,7 +283,7 @@ binary_sensor:
         then:
           - logger.log: "KEY2 双击"
           - homeassistant.event:
-              event: gateway_key
+              event: esphome.gateway_key  # <--- 修复点
               data:
                 key: "key2"
                 mode: "double"
@@ -302,7 +300,7 @@ binary_sensor:
         then:
           - logger.log: "KEY3 长按"
           - homeassistant.event:
-              event: gateway_key
+              event: esphome.gateway_key  # <--- 修复点
               data:
                 key: "key3"
                 mode: "long"
@@ -313,7 +311,7 @@ binary_sensor:
         then:
           - logger.log: "KEY3 单击"
           - homeassistant.event:
-              event: gateway_key
+              event: esphome.gateway_key  # <--- 修复点
               data:
                 key: "key3"
                 mode: "single"
@@ -326,7 +324,7 @@ binary_sensor:
         then:
           - logger.log: "KEY3 双击"
           - homeassistant.event:
-              event: gateway_key
+              event: esphome.gateway_key  # <--- 修复点
               data:
                 key: "key3"
                 mode: "double"
@@ -343,7 +341,7 @@ binary_sensor:
         then:
           - logger.log: "KEY4 长按"
           - homeassistant.event:
-              event: gateway_key
+              event: esphome.gateway_key  # <--- 修复点
               data:
                 key: "key4"
                 mode: "long"
@@ -354,7 +352,7 @@ binary_sensor:
         then:
           - logger.log: "KEY4 单击"
           - homeassistant.event:
-              event: gateway_key
+              event: esphome.gateway_key  # <--- 修复点
               data:
                 key: "key4"
                 mode: "single"
@@ -367,7 +365,7 @@ binary_sensor:
         then:
           - logger.log: "KEY4 双击"
           - homeassistant.event:
-              event: gateway_key
+              event: esphome.gateway_key  # <--- 修复点
               data:
                 key: "key4"
                 mode: "double"
