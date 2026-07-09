@@ -1,6 +1,9 @@
+substitutions:
+  test_gpio: "2"
+
 esphome:
-  name: yeelight-gpio-scan
-  friendly_name: Yeelight GPIO Scan
+  name: yeelight-led-test
+  friendly_name: Yeelight LED Test
 
 esp32:
   board: esp32dev
@@ -35,191 +38,60 @@ text_sensor:
     ip_address:
       name: IP
 
+# 已确认的四个按键
 binary_sensor:
   - platform: gpio
-    pin: { number: GPIO0, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO0
-    on_press:
-      - logger.log: "===== GPIO0 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO0 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO2, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO2
-    on_press:
-      - logger.log: "===== GPIO2 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO2 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO4, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO4
-    on_press:
-      - logger.log: "===== GPIO4 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO4 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO5, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO5
-    on_press:
-      - logger.log: "===== GPIO5 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO5 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO12, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO12
-    on_press:
-      - logger.log: "===== GPIO12 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO12 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO13, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO13
-    on_press:
-      - logger.log: "===== GPIO13 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO13 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO14, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO14
-    on_press:
-      - logger.log: "===== GPIO14 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO14 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO15, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO15
-    on_press:
-      - logger.log: "===== GPIO15 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO15 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO16, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO16
-    on_press:
-      - logger.log: "===== GPIO16 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO16 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO17, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO17
-    on_press:
-      - logger.log: "===== GPIO17 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO17 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO18, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO18
-    on_press:
-      - logger.log: "===== GPIO18 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO18 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO19, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO19
-    on_press:
-      - logger.log: "===== GPIO19 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO19 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO21, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO21
-    on_press:
-      - logger.log: "===== GPIO21 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO21 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO22, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO22
-    on_press:
-      - logger.log: "===== GPIO22 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO22 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO23, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO23
-    on_press:
-      - logger.log: "===== GPIO23 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO23 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO25, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO25
-    on_press:
-      - logger.log: "===== GPIO25 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO25 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO26, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO26
-    on_press:
-      - logger.log: "===== GPIO26 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO26 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO27, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO27
-    on_press:
-      - logger.log: "===== GPIO27 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO27 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO32, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO32
-    on_press:
-      - logger.log: "===== GPIO32 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO32 RELEASED ====="
-
-  - platform: gpio
-    pin: { number: GPIO33, mode: INPUT_PULLUP, inverted: true }
-    name: GPIO33
-    on_press:
-      - logger.log: "===== GPIO33 PRESSED ====="
-    on_release:
-      - logger.log: "===== GPIO33 RELEASED ====="
-
-  - platform: gpio
     pin: GPIO34
-    name: GPIO34
+    name: KEY1
     on_press:
-      - logger.log: "===== GPIO34 HIGH ====="
+      - logger.log: "KEY1"
 
   - platform: gpio
     pin: GPIO35
-    name: GPIO35
+    name: KEY2
     on_press:
-      - logger.log: "===== GPIO35 HIGH ====="
+      - logger.log: "KEY2"
 
   - platform: gpio
-    pin: GPIO36
-    name: GPIO36
+    pin: GPIO32
+    name: KEY3
     on_press:
-      - logger.log: "===== GPIO36 HIGH ====="
+      - logger.log: "KEY3"
 
   - platform: gpio
-    pin: GPIO39
-    name: GPIO39
+    pin: GPIO33
+    name: KEY4
     on_press:
-      - logger.log: "===== GPIO39 HIGH ====="
+      - logger.log: "KEY4"
+
+output:
+  - platform: gpio
+    id: test_output
+    pin:
+      number: GPIO${test_gpio}
 
 switch:
+  - platform: output
+    name: GPIO ${test_gpio}
+    output: test_output
+
+button:
+  - platform: template
+    name: 测试GPIO
+    on_press:
+      - logger.log: "========== START TEST =========="
+      - output.turn_on: test_output
+      - delay: 1s
+      - output.turn_off: test_output
+      - delay: 300ms
+      - output.turn_on: test_output
+      - delay: 300ms
+      - output.turn_off: test_output
+      - delay: 300ms
+      - output.turn_on: test_output
+      - delay: 300ms
+      - output.turn_off: test_output
+      - logger.log: "========== END TEST =========="
+
   - platform: restart
     name: Restart
