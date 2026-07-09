@@ -92,6 +92,137 @@ button:
       - delay: 300ms
       - output.turn_off: test_output
       - logger.log: "========== END TEST =========="
+output:
+  - platform: gpio
+    id: gpio2
+    pin: GPIO2
+  - platform: gpio
+    id: gpio4
+    pin: GPIO4
+  - platform: gpio
+    id: gpio5
+    pin: GPIO5
+  - platform: gpio
+    id: gpio12
+    pin: GPIO12
+  - platform: gpio
+    id: gpio13
+    pin: GPIO13
+  - platform: gpio
+    id: gpio14
+    pin: GPIO14
+  - platform: gpio
+    id: gpio15
+    pin: GPIO15
+  - platform: gpio
+    id: gpio16
+    pin: GPIO16
+  - platform: gpio
+    id: gpio17
+    pin: GPIO17
+  - platform: gpio
+    id: gpio18
+    pin: GPIO18
+  - platform: gpio
+    id: gpio19
+    pin: GPIO19
+  - platform: gpio
+    id: gpio21
+    pin: GPIO21
+  - platform: gpio
+    id: gpio22
+    pin: GPIO22
+  - platform: gpio
+    id: gpio23
+    pin: GPIO23
+  - platform: gpio
+    id: gpio25
+    pin: GPIO25
+  - platform: gpio
+    id: gpio26
+    pin: GPIO26
+  - platform: gpiobutton:
+  - platform: template
+    name: "测试 第一组"
+    on_press:
+      - output.turn_on: gpio2
+      - delay: 800ms
+      - output.turn_off: gpio2
 
-  - platform: restart
-    name: Restart
+      - output.turn_on: gpio4
+      - delay: 800ms
+      - output.turn_off: gpio4
+
+      - output.turn_on: gpio5
+      - delay: 800ms
+      - output.turn_off: gpio5
+
+      - output.turn_on: gpio12
+      - delay: 800ms
+      - output.turn_off: gpio12
+
+  - platform: template
+    name: "测试 第二组"
+    on_press:
+      - output.turn_on: gpio13
+      - delay: 800ms
+      - output.turn_off: gpio13
+
+      - output.turn_on: gpio14
+      - delay: 800ms
+      - output.turn_off: gpio14
+
+      - output.turn_on: gpio15
+      - delay: 800ms
+      - output.turn_off: gpio15
+
+      - output.turn_on: gpio16
+      - delay: 800ms
+      - output.turn_off: gpio16
+
+  - platform: template
+    name: "测试 第三组"
+    on_press:
+      - output.turn_on: gpio17
+      - delay: 800ms
+      - output.turn_off: gpio17
+
+      - output.turn_on: gpio18
+      - delay: 800ms
+      - output.turn_off: gpio18
+
+      - output.turn_on: gpio19
+      - delay: 800ms
+      - output.turn_off: gpio19
+
+      - output.turn_on: gpio21
+      - delay: 800ms
+      - output.turn_off: gpio21
+
+  - platform: template
+    name: "测试 第四组"
+    on_press:
+      - output.turn_on: gpio22
+      - delay: 800ms
+      - output.turn_off: gpio22
+
+      - output.turn_on: gpio23
+      - delay: 800ms
+      - output.turn_off: gpio23
+
+      - output.turn_on: gpio25
+      - delay: 800ms
+      - output.turn_off: gpio25
+
+      - output.turn_on: gpio26
+      - delay: 800ms
+      - output.turn_off: gpio26
+
+  - platform: template
+    name: "测试 第五组"
+    on_press:
+      - output.turn_on: gpio27
+      - delay: 800ms
+      - output.turn_off: gpio27
+    id: gpio27
+    pin: GPIO27
