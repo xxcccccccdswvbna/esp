@@ -127,11 +127,12 @@ switch:
     name: GPIO ${test_gpio}
     output: test_output
 
-# ================= 所有的 button 定义 (已添加唯一 id) =================
+# ================= 所有的 button 定义 =================
+# ⚠️ 注意：name 中加入了数字，防止纯中文转换成下划线导致 ID 冲突
 button:
   - platform: template
-    name: 测试GPIO
-    id: btn_test_gpio  # <--- 新增唯一 ID
+    name: "测试 GPIO"
+    id: btn_test_gpio
     on_press:
       - logger.log: "========== START TEST =========="
       - output.turn_on: test_output
@@ -148,8 +149,8 @@ button:
       - logger.log: "========== END TEST =========="
 
   - platform: template
-    name: "测试 第一组"
-    id: btn_group_1    # <--- 新增唯一 ID
+    name: "测试组 1"  # <--- 修改了名称，加入数字
+    id: btn_group_1
     on_press:
       - output.turn_on: gpio2
       - delay: 800ms
@@ -165,8 +166,8 @@ button:
       - output.turn_off: gpio12
 
   - platform: template
-    name: "测试 第二组"
-    id: btn_group_2    # <--- 新增唯一 ID
+    name: "测试组 2"  # <--- 修改了名称，加入数字
+    id: btn_group_2
     on_press:
       - output.turn_on: gpio13
       - delay: 800ms
@@ -182,8 +183,8 @@ button:
       - output.turn_off: gpio16
 
   - platform: template
-    name: "测试 第三组"
-    id: btn_group_3    # <--- 新增唯一 ID
+    name: "测试组 3"  # <--- 修改了名称，加入数字
+    id: btn_group_3
     on_press:
       - output.turn_on: gpio17
       - delay: 800ms
@@ -199,8 +200,8 @@ button:
       - output.turn_off: gpio21
 
   - platform: template
-    name: "测试 第四组"
-    id: btn_group_4    # <--- 新增唯一 ID
+    name: "测试组 4"  # <--- 修改了名称，加入数字
+    id: btn_group_4
     on_press:
       - output.turn_on: gpio22
       - delay: 800ms
@@ -216,8 +217,8 @@ button:
       - output.turn_off: gpio26
 
   - platform: template
-    name: "测试 第五组"
-    id: btn_group_5    # <--- 新增唯一 ID
+    name: "测试组 5"  # <--- 修改了名称，加入数字
+    id: btn_group_5
     on_press:
       - output.turn_on: gpio27
       - delay: 800ms
