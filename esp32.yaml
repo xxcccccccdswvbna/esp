@@ -64,35 +64,12 @@ binary_sensor:
     on_press:
       - logger.log: "KEY4"
 
+# ================= 合并所有的 output =================
 output:
   - platform: gpio
     id: test_output
     pin:
       number: GPIO${test_gpio}
-
-switch:
-  - platform: output
-    name: GPIO ${test_gpio}
-    output: test_output
-
-button:
-  - platform: template
-    name: 测试GPIO
-    on_press:
-      - logger.log: "========== START TEST =========="
-      - output.turn_on: test_output
-      - delay: 1s
-      - output.turn_off: test_output
-      - delay: 300ms
-      - output.turn_on: test_output
-      - delay: 300ms
-      - output.turn_off: test_output
-      - delay: 300ms
-      - output.turn_on: test_output
-      - delay: 300ms
-      - output.turn_off: test_output
-      - logger.log: "========== END TEST =========="
-output:
   - platform: gpio
     id: gpio2
     pin: GPIO2
@@ -141,22 +118,46 @@ output:
   - platform: gpio
     id: gpio26
     pin: GPIO26
-  - platform: gpiobutton:
+  - platform: gpio
+    id: gpio27
+    pin: GPIO27
+
+switch:
+  - platform: output
+    name: GPIO ${test_gpio}
+    output: test_output
+
+# ================= 合并所有的 button =================
+button:
+  - platform: template
+    name: 测试GPIO
+    on_press:
+      - logger.log: "========== START TEST =========="
+      - output.turn_on: test_output
+      - delay: 1s
+      - output.turn_off: test_output
+      - delay: 300ms
+      - output.turn_on: test_output
+      - delay: 300ms
+      - output.turn_off: test_output
+      - delay: 300ms
+      - output.turn_on: test_output
+      - delay: 300ms
+      - output.turn_off: test_output
+      - logger.log: "========== END TEST =========="
+
   - platform: template
     name: "测试 第一组"
     on_press:
       - output.turn_on: gpio2
       - delay: 800ms
       - output.turn_off: gpio2
-
       - output.turn_on: gpio4
       - delay: 800ms
       - output.turn_off: gpio4
-
       - output.turn_on: gpio5
       - delay: 800ms
       - output.turn_off: gpio5
-
       - output.turn_on: gpio12
       - delay: 800ms
       - output.turn_off: gpio12
@@ -167,15 +168,12 @@ output:
       - output.turn_on: gpio13
       - delay: 800ms
       - output.turn_off: gpio13
-
       - output.turn_on: gpio14
       - delay: 800ms
       - output.turn_off: gpio14
-
       - output.turn_on: gpio15
       - delay: 800ms
       - output.turn_off: gpio15
-
       - output.turn_on: gpio16
       - delay: 800ms
       - output.turn_off: gpio16
@@ -186,15 +184,12 @@ output:
       - output.turn_on: gpio17
       - delay: 800ms
       - output.turn_off: gpio17
-
       - output.turn_on: gpio18
       - delay: 800ms
       - output.turn_off: gpio18
-
       - output.turn_on: gpio19
       - delay: 800ms
       - output.turn_off: gpio19
-
       - output.turn_on: gpio21
       - delay: 800ms
       - output.turn_off: gpio21
@@ -205,15 +200,12 @@ output:
       - output.turn_on: gpio22
       - delay: 800ms
       - output.turn_off: gpio22
-
       - output.turn_on: gpio23
       - delay: 800ms
       - output.turn_off: gpio23
-
       - output.turn_on: gpio25
       - delay: 800ms
       - output.turn_off: gpio25
-
       - output.turn_on: gpio26
       - delay: 800ms
       - output.turn_off: gpio26
@@ -224,5 +216,3 @@ output:
       - output.turn_on: gpio27
       - delay: 800ms
       - output.turn_off: gpio27
-    id: gpio27
-    pin: GPIO27
