@@ -561,139 +561,134 @@ select:
       - script.execute: ble_send
   # ================= 在原有配置末尾添加以下 Button 定义 =================
 
+# ================= 按钮 (Button) =================
 button:
-  # KEY1 按键事件按钮
+  # 1. 系统重启按钮 (必须放在 button 下)
+  - platform: restart
+    name: "Restart Device"
+
+  # 2. 原有的 Dev1 / Dev2 控制按钮
+  - platform: template
+    name: "Dev1 Light Toggle"
+    icon: mdi:lightbulb
+    on_press:
+      - lambda: |-
+          if (millis() - id(last_cmd_time) < 200) return; id(last_cmd_time) = millis();
+          id(pkt_1)={0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x86,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x40};
+          id(pkt_2)={0x11,0x4D,0x19,0x1C,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x71,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x25};
+      - script.execute: ble_send
+
+  - platform: template
+    name: "Dev1 Fan Reverse"
+    icon: mdi:sync-reverse
+    on_press:
+      - lambda: |-
+          if (millis() - id(last_cmd_time) < 200) return; id(last_cmd_time) = millis();
+          id(pkt_1)={0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x9C,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x56};
+          id(pkt_2)={0x11,0x4D,0x19,0x18,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x81,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF2};
+      - script.execute: ble_send
+
+  - platform: template
+    name: "Dev2 Light Toggle"
+    icon: mdi:lightbulb
+    on_press:
+      - lambda: |-
+          if (millis() - id(last_cmd_time) < 200) return; id(last_cmd_time) = millis();
+          id(pkt_1)={0x11,0x4D,0x19,0x14,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xF1,0xFC,0x39,0xCF,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x1D,0x68};
+          id(pkt_2)={0x11,0x4D,0x19,0x11,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0x1C,0x60,0xF0,0xF0,0xFC,0x3F,0xCF,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5E};
+      - script.execute: ble_send
+
+  - platform: template
+    name: "Dev2 Fan Reverse"
+    icon: mdi:sync-reverse
+    on_press:
+      - lambda: |-
+          if (millis() - id(last_cmd_time) < 200) return; id(last_cmd_time) = millis();
+          id(pkt_1)={0x11,0x4D,0x19,0x15,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xFD,0x3F,0x49,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x1D,0x60,0x78};
+          id(pkt_2)={0x11,0x4D,0x19,0x1A,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0x2C,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x1D,0x60,0xF0,0xF0,0xFC,0x3F,0xCF,0xCD};
+      - script.execute: ble_send
+
+  # 3. 新增的 KEY1~KEY4 模拟按键 (用于在 HA 中直接调用)
   - platform: template
     name: "KEY1 Single Click"
-    id: key1_single
-    entity_category: diagnostic
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data:
-            key: "key1"
-            mode: "single"
+          data: { key: "key1", mode: "single" }
 
   - platform: template
     name: "KEY1 Double Click"
-    id: key1_double
-    entity_category: diagnostic
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data:
-            key: "key1"
-            mode: "double"
+          data: { key: "key1", mode: "double" }
 
   - platform: template
     name: "KEY1 Long Press"
-    id: key1_long
-    entity_category: diagnostic
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data:
-            key: "key1"
-            mode: "long"
+          data: { key: "key1", mode: "long" }
 
-  # KEY2 按键事件按钮
   - platform: template
     name: "KEY2 Single Click"
-    id: key2_single
-    entity_category: diagnostic
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data:
-            key: "key2"
-            mode: "single"
+          data: { key: "key2", mode: "single" }
 
   - platform: template
     name: "KEY2 Double Click"
-    id: key2_double
-    entity_category: diagnostic
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data:
-            key: "key2"
-            mode: "double"
+          data: { key: "key2", mode: "double" }
 
   - platform: template
     name: "KEY2 Long Press"
-    id: key2_long
-    entity_category: diagnostic
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data:
-            key: "key2"
-            mode: "long"
+          data: { key: "key2", mode: "long" }
 
-  # KEY3 按键事件按钮
   - platform: template
     name: "KEY3 Single Click"
-    id: key3_single
-    entity_category: diagnostic
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data:
-            key: "key3"
-            mode: "single"
+          data: { key: "key3", mode: "single" }
 
   - platform: template
     name: "KEY3 Double Click"
-    id: key3_double
-    entity_category: diagnostic
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data:
-            key: "key3"
-            mode: "double"
+          data: { key: "key3", mode: "double" }
 
   - platform: template
     name: "KEY3 Long Press"
-    id: key3_long
-    entity_category: diagnostic
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data:
-            key: "key3"
-            mode: "long"
+          data: { key: "key3", mode: "long" }
 
-  # KEY4 按键事件按钮
   - platform: template
     name: "KEY4 Single Click"
-    id: key4_single
-    entity_category: diagnostic
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data:
-            key: "key4"
-            mode: "single"
+          data: { key: "key4", mode: "single" }
 
   - platform: template
     name: "KEY4 Double Click"
-    id: key4_double
-    entity_category: diagnostic
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data:
-            key: "key4"
-            mode: "double"
+          data: { key: "key4", mode: "double" }
 
   - platform: template
     name: "KEY4 Long Press"
-    id: key4_long
-    entity_category: diagnostic
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data:
-            key: "key4"
-            mode: "long"    
+          data: { key: "key4", mode: "long" }
