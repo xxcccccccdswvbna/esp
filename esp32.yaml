@@ -1,6 +1,6 @@
 esphome:
-  name: yeelight-gpio-pro
-  friendly_name: Yeelight GPIO Pro
+  name: yeelight-gateway-v3
+  friendly_name: Yeelight Gateway V3
 
 esp32:
   board: esp32dev
@@ -11,7 +11,6 @@ esp32:
       CONFIG_FREERTOS_UNICORE: y
 
 logger:
-  level: VERY_VERBOSE
 
 api:
 
@@ -21,172 +20,82 @@ ota:
 wifi:
   ssid: "CC"
   password: "chen1122"
-  ap:
-    ssid: "Yeelight-Pro"
-    password: "12345678"
 
 captive_portal:
 
 web_server:
 
+esp32_ble_tracker:
+
+bluetooth_proxy:
+  active: true
+
 sensor:
   - platform: uptime
     name: Uptime
+
+  - platform: wifi_signal
+    name: WiFi RSSI
 
 text_sensor:
   - platform: wifi_info
     ip_address:
       name: IP
 
-binary_sensor:
-  - platform: gpio
-    pin: GPIO34
-    name: KEY1
-    on_press:
-      - logger.log: "KEY1"
-
-  - platform: gpio
-    pin: GPIO35
-    name: KEY2
-    on_press:
-      - logger.log: "KEY2"
-
-  - platform: gpio
-    pin: GPIO32
-    name: KEY3
-    on_press:
-      - logger.log: "KEY3"
-
-  - platform: gpio
-    pin: GPIO33
-    name: KEY4
-    on_press:
-      - logger.log: "KEY4"
-
 output:
   - platform: gpio
-    id: gpio2
-    pin: GPIO2
+    id: blue_led_out
+    pin:
+      number: GPIO27
+      inverted: true
   - platform: gpio
-    id: gpio4
-    pin: GPIO4
+    id: white_led_out
+    pin:
+      number: GPIO26
+      inverted: true
+
+light:
+  - platform: binary
+    name: Blue LED
+    id: blue_led
+    output: blue_led_out
+
+  - platform: binary
+    name: White LED
+    id: white_led
+    output: white_led_out
+
+binary_sensor:
   - platform: gpio
-    id: gpio5
-    pin: GPIO5
+    pin:
+      number: GPIO34
+    name: KEY1
+    on_press:
+      - light.toggle: blue_led
+
   - platform: gpio
-    id: gpio12
-    pin: GPIO12
+    pin:
+      number: GPIO35
+    name: KEY2
+    on_press:
+      - light.toggle: white_led
+
   - platform: gpio
-    id: gpio13
-    pin: GPIO13
+    pin:
+      number: GPIO32
+    name: KEY3
+    on_press:
+      - light.turn_on: blue_led
+      - light.turn_on: white_led
+
   - platform: gpio
-    id: gpio14
-    pin: GPIO14
-  - platform: gpio
-    id: gpio15
-    pin: GPIO15
-  - platform: gpio
-    id: gpio16
-    pin: GPIO16
-  - platform: gpio
-    id: gpio17
-    pin: GPIO17
-  - platform: gpio
-    id: gpio18
-    pin: GPIO18
-  - platform: gpio
-    id: gpio19
-    pin: GPIO19
-  - platform: gpio
-    id: gpio21
-    pin: GPIO21
-  - platform: gpio
-    id: gpio22
-    pin: GPIO22
-  - platform: gpio
-    id: gpio23
-    pin: GPIO23
-  - platform: gpio
-    id: gpio25
-    pin: GPIO25
-  - platform: gpio
-    id: gpio26
-    pin: GPIO26
-  - platform: gpio
-    id: gpio27
-    pin: GPIO27
+    pin:
+      number: GPIO33
+    name: KEY4
+    on_press:
+      - light.turn_off: blue_led
+      - light.turn_off: white_led
 
 button:
-  - platform: template
-    name: Test Group 1
-    on_press:
-      - output.turn_on: gpio2
-      - delay: 800ms
-      - output.turn_off: gpio2
-      - output.turn_on: gpio4
-      - delay: 800ms
-      - output.turn_off: gpio4
-      - output.turn_on: gpio5
-      - delay: 800ms
-      - output.turn_off: gpio5
-      - output.turn_on: gpio12
-      - delay: 800ms
-      - output.turn_off: gpio12
-
-  - platform: template
-    name: Test Group 2
-    on_press:
-      - output.turn_on: gpio13
-      - delay: 800ms
-      - output.turn_off: gpio13
-      - output.turn_on: gpio14
-      - delay: 800ms
-      - output.turn_off: gpio14
-      - output.turn_on: gpio15
-      - delay: 800ms
-      - output.turn_off: gpio15
-      - output.turn_on: gpio16
-      - delay: 800ms
-      - output.turn_off: gpio16
-
-  - platform: template
-    name: Test Group 3
-    on_press:
-      - output.turn_on: gpio17
-      - delay: 800ms
-      - output.turn_off: gpio17
-      - output.turn_on: gpio18
-      - delay: 800ms
-      - output.turn_off: gpio18
-      - output.turn_on: gpio19
-      - delay: 800ms
-      - output.turn_off: gpio19
-      - output.turn_on: gpio21
-      - delay: 800ms
-      - output.turn_off: gpio21
-
-  - platform: template
-    name: Test Group 4
-    on_press:
-      - output.turn_on: gpio22
-      - delay: 800ms
-      - output.turn_off: gpio22
-      - output.turn_on: gpio23
-      - delay: 800ms
-      - output.turn_off: gpio23
-      - output.turn_on: gpio25
-      - delay: 800ms
-      - output.turn_off: gpio25
-      - output.turn_on: gpio26
-      - delay: 800ms
-      - output.turn_off: gpio26
-
-  - platform: template
-    name: Test GPIO27
-    on_press:
-      - output.turn_on: gpio27
-      - delay: 800ms
-      - output.turn_off: gpio27
-
   - platform: restart
     name: Restart Device
