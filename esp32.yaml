@@ -64,7 +64,7 @@ binary_sensor:
     on_press:
       - logger.log: "KEY4"
 
-# ================= 合并所有的 output =================
+# ================= 所有的 output 定义 =================
 output:
   - platform: gpio
     id: test_output
@@ -127,10 +127,11 @@ switch:
     name: GPIO ${test_gpio}
     output: test_output
 
-# ================= 合并所有的 button =================
+# ================= 所有的 button 定义 (已添加唯一 id) =================
 button:
   - platform: template
     name: 测试GPIO
+    id: btn_test_gpio  # <--- 新增唯一 ID
     on_press:
       - logger.log: "========== START TEST =========="
       - output.turn_on: test_output
@@ -148,6 +149,7 @@ button:
 
   - platform: template
     name: "测试 第一组"
+    id: btn_group_1    # <--- 新增唯一 ID
     on_press:
       - output.turn_on: gpio2
       - delay: 800ms
@@ -164,6 +166,7 @@ button:
 
   - platform: template
     name: "测试 第二组"
+    id: btn_group_2    # <--- 新增唯一 ID
     on_press:
       - output.turn_on: gpio13
       - delay: 800ms
@@ -180,6 +183,7 @@ button:
 
   - platform: template
     name: "测试 第三组"
+    id: btn_group_3    # <--- 新增唯一 ID
     on_press:
       - output.turn_on: gpio17
       - delay: 800ms
@@ -196,6 +200,7 @@ button:
 
   - platform: template
     name: "测试 第四组"
+    id: btn_group_4    # <--- 新增唯一 ID
     on_press:
       - output.turn_on: gpio22
       - delay: 800ms
@@ -212,6 +217,7 @@ button:
 
   - platform: template
     name: "测试 第五组"
+    id: btn_group_5    # <--- 新增唯一 ID
     on_press:
       - output.turn_on: gpio27
       - delay: 800ms
