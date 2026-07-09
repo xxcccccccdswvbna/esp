@@ -1,7 +1,6 @@
 esphome:
   name: yeelight-gateway-v3
   friendly_name: "Yeelight Gateway V3"
-  # <--- 新增：重启时双灯常亮
   on_boot:
     priority: 600.0
     then:
@@ -18,12 +17,11 @@ esp32:
 
 logger:
 
-# <--- 新增：监听 API 连接状态，控制断网闪烁和启动完成关灯
 api:
   on_client_connected:
     - script.stop: offline_flash
     - light.turn_off: white_led
-    - light.turn_off: blue_led  # 启动完成且联网后，关闭所有灯
+    - light.turn_off: blue_led
   on_client_disconnected:
     - script.execute: offline_flash
 
@@ -104,7 +102,6 @@ script:
       - delay: 50ms
       - lambda: 'id(ble_server).set_manufacturer_data({});'
 
-  # <--- 新增：断网时白灯循环闪烁脚本
   - id: offline_flash
     mode: restart
     then:
@@ -190,8 +187,6 @@ binary_sensor:
     device_class: running
     icon: mdi:fan
 
-  # ================= 物理按键 (按键闪蓝灯，闪完即灭) =================
-  
   # KEY1 GPIO34
   - platform: gpio
     id: key1
@@ -203,7 +198,6 @@ binary_sensor:
       - delayed_on: 20ms
       - delayed_off: 20ms
     on_multi_click:
-      # 长按 8s (恢复出厂)
       - timing:
           - ON for at least 8s
         then:
@@ -223,7 +217,6 @@ binary_sensor:
                             - light.toggle: white_led
                             - delay: 100ms
                       - lambda: 'App.reboot();'
-      # 长按 1.5s
       - timing:
           - ON for at least 1.5s
         then:
@@ -232,8 +225,9 @@ binary_sensor:
           - light.turn_off: blue_led
           - homeassistant.event:
               event: esphome.gateway_key
-              data: { key: "key1", mode: "long" }
-      # 双击
+              data:
+                key: "key1"
+                mode: "long"
       - timing:
           - ON for at most 0.5s
           - OFF for at most 0.3s
@@ -245,8 +239,9 @@ binary_sensor:
           - light.turn_off: blue_led
           - homeassistant.event:
               event: esphome.gateway_key
-              data: { key: "key1", mode: "double" }
-      # 单击
+              data:
+                key: "key1"
+                mode: "double"
       - timing:
           - ON for at most 0.5s
           - OFF for at least 0.3s
@@ -256,7 +251,9 @@ binary_sensor:
           - light.turn_off: blue_led
           - homeassistant.event:
               event: esphome.gateway_key
-              data: { key: "key1", mode: "single" }
+              data:
+                key: "key1"
+                mode: "single"
 
   # KEY2 GPIO35
   - platform: gpio
@@ -269,7 +266,6 @@ binary_sensor:
       - delayed_on: 20ms
       - delayed_off: 20ms
     on_multi_click:
-      # 长按 1.5s
       - timing:
           - ON for at least 1.5s
         then:
@@ -278,8 +274,9 @@ binary_sensor:
           - light.turn_off: blue_led
           - homeassistant.event:
               event: esphome.gateway_key
-              data: { key: "key2", mode: "long" }
-      # 双击
+              data:
+                key: "key2"
+                mode: "long"
       - timing:
           - ON for at most 0.5s
           - OFF for at most 0.3s
@@ -291,8 +288,9 @@ binary_sensor:
           - light.turn_off: blue_led
           - homeassistant.event:
               event: esphome.gateway_key
-              data: { key: "key2", mode: "double" }
-      # 单击 (含安全模式计数)
+              data:
+                key: "key2"
+                mode: "double"
       - timing:
           - ON for at most 0.5s
           - OFF for at least 0.3s
@@ -302,7 +300,9 @@ binary_sensor:
           - light.turn_off: blue_led
           - homeassistant.event:
               event: esphome.gateway_key
-              data: { key: "key2", mode: "single" }
+              data:
+                key: "key2"
+                mode: "single"
           - lambda: 'id(safe_mode_tap_count)++;'
           - if:
               condition:
@@ -330,7 +330,6 @@ binary_sensor:
       - delayed_on: 20ms
       - delayed_off: 20ms
     on_multi_click:
-      # 长按 1.5s
       - timing:
           - ON for at least 1.5s
         then:
@@ -339,8 +338,9 @@ binary_sensor:
           - light.turn_off: blue_led
           - homeassistant.event:
               event: esphome.gateway_key
-              data: { key: "key3", mode: "long" }
-      # 双击
+              data:
+                key: "key3"
+                mode: "long"
       - timing:
           - ON for at most 0.5s
           - OFF for at most 0.3s
@@ -352,8 +352,9 @@ binary_sensor:
           - light.turn_off: blue_led
           - homeassistant.event:
               event: esphome.gateway_key
-              data: { key: "key3", mode: "double" }
-      # 单击
+              data:
+                key: "key3"
+                mode: "double"
       - timing:
           - ON for at most 0.5s
           - OFF for at least 0.3s
@@ -363,7 +364,9 @@ binary_sensor:
           - light.turn_off: blue_led
           - homeassistant.event:
               event: esphome.gateway_key
-              data: { key: "key3", mode: "single" }
+              data:
+                key: "key3"
+                mode: "single"
 
   # KEY4 GPIO33
   - platform: gpio
@@ -376,7 +379,6 @@ binary_sensor:
       - delayed_on: 20ms
       - delayed_off: 20ms
     on_multi_click:
-      # 长按 1.5s
       - timing:
           - ON for at least 1.5s
         then:
@@ -385,8 +387,9 @@ binary_sensor:
           - light.turn_off: blue_led
           - homeassistant.event:
               event: esphome.gateway_key
-              data: { key: "key4", mode: "long" }
-      # 双击
+              data:
+                key: "key4"
+                mode: "long"
       - timing:
           - ON for at most 0.5s
           - OFF for at most 0.3s
@@ -398,8 +401,9 @@ binary_sensor:
           - light.turn_off: blue_led
           - homeassistant.event:
               event: esphome.gateway_key
-              data: { key: "key4", mode: "double" }
-      # 单击
+              data:
+                key: "key4"
+                mode: "double"
       - timing:
           - ON for at most 0.5s
           - OFF for at least 0.3s
@@ -409,7 +413,9 @@ binary_sensor:
           - light.turn_off: blue_led
           - homeassistant.event:
               event: esphome.gateway_key
-              data: { key: "key4", mode: "single" }
+              data:
+                key: "key4"
+                mode: "single"
 
 # ================= 下拉选择框 (Select) =================
 select:
@@ -447,7 +453,7 @@ select:
           else { id(pkt_1)={0x11,0x4D,0x19,0x14,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x49,0xA6,0xA5,0x7A,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xEA}; id(pkt_2)={0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x80,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x4A}; }
       - script.execute: ble_send
 
-  # 🟦 Dev1 风扇 (8 合 1)
+  # 🟦 Dev1 风扇
   - platform: template
     name: "Dev1 Fan Speed Select"
     id: dev1_fan_select
@@ -498,7 +504,7 @@ select:
           else { id(pkt_1)={0x11,0x4D,0x19,0x17,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xCE,0xCE,0xC8,0xD2,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x1D,0x60,0xF0,0xF0,0xAB}; id(pkt_2)={0x11,0x4D,0x19,0x1E,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0x01,0x5C,0xBF,0x1D,0x60,0xF0,0xF0,0xFC,0x3F,0xCF,0xCF,0x9D,0x2D,0x2D,0x72}; }
       - script.execute: ble_send
 
-  # 🟧 Dev2 风扇 (8 合 1)
+  # 🟧 Dev2 风扇
   - platform: template
     name: "Dev2 Fan Speed Select"
     id: dev2_fan_select
@@ -517,53 +523,9 @@ select:
           else { id(pkt_1)={0x11,0x4D,0x19,0x13,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xF1,0xF0,0x7A,0x3F,0xCF,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x95}; id(pkt_2)={0x11,0x4D,0x19,0x15,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xFD,0x3F,0xCF,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x1D,0x60,0xF2}; }
       - script.execute: ble_send
 
-  - platform: restart
-    name: Restart Device
-
-  - platform: template
-    name: "Dev1 Light Toggle"
-    icon: mdi:lightbulb
-    on_press:
-      - lambda: |-
-          if (millis() - id(last_cmd_time) < 200) return; id(last_cmd_time) = millis();
-          id(pkt_1)={0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x86,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x40};
-          id(pkt_2)={0x11,0x4D,0x19,0x1C,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x71,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF0,0x80,0x80,0x97,0x25};
-      - script.execute: ble_send
-
-  - platform: template
-    name: "Dev1 Fan Reverse"
-    icon: mdi:sync-reverse
-    on_press:
-      - lambda: |-
-          if (millis() - id(last_cmd_time) < 200) return; id(last_cmd_time) = millis();
-          id(pkt_1)={0x11,0x4D,0x19,0x15,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0xA6,0xF0,0x9C,0x80,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x56};
-          id(pkt_2)={0x11,0x4D,0x19,0x18,0x48,0x80,0x27,0x70,0x00,0x00,0x01,0x81,0x97,0x27,0x27,0x70,0x70,0x00,0x5F,0xC8,0x6F,0xB8,0x48,0x48,0xA7,0xF2};
-      - script.execute: ble_send
-
-  - platform: template
-    name: "Dev2 Light Toggle"
-    icon: mdi:lightbulb
-    on_press:
-      - lambda: |-
-          if (millis() - id(last_cmd_time) < 200) return; id(last_cmd_time) = millis();
-          id(pkt_1)={0x11,0x4D,0x19,0x14,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xF1,0xFC,0x39,0xCF,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x1D,0x68};
-          id(pkt_2)={0x11,0x4D,0x19,0x11,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0x1C,0x60,0xF0,0xF0,0xFC,0x3F,0xCF,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5E};
-      - script.execute: ble_send
-
-  - platform: template
-    name: "Dev2 Fan Reverse"
-    icon: mdi:sync-reverse
-    on_press:
-      - lambda: |-
-          if (millis() - id(last_cmd_time) < 200) return; id(last_cmd_time) = millis();
-          id(pkt_1)={0x11,0x4D,0x19,0x15,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0xFD,0x3F,0x49,0xCF,0x9D,0x2D,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x1D,0x60,0x78};
-          id(pkt_2)={0x11,0x4D,0x19,0x1A,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0x2C,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x1D,0x60,0xF0,0xF0,0xFC,0x3F,0xCF,0xCD};
-      - script.execute: ble_send
-  # ================= 在原有配置末尾添加以下 Button 定义 =================
-
 # ================= 按钮 (Button) =================
 button:
-  # 1. 系统重启按钮 (必须放在 button 下)
+  # 1. 系统重启按钮
   - platform: restart
     name: "Restart Device"
 
@@ -614,81 +576,105 @@ button:
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data: { key: "key1", mode: "single" }
+          data:
+            key: "key1"
+            mode: "single"
 
   - platform: template
     name: "KEY1 Double Click"
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data: { key: "key1", mode: "double" }
+          data:
+            key: "key1"
+            mode: "double"
 
   - platform: template
     name: "KEY1 Long Press"
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data: { key: "key1", mode: "long" }
+          data:
+            key: "key1"
+            mode: "long"
 
   - platform: template
     name: "KEY2 Single Click"
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data: { key: "key2", mode: "single" }
+          data:
+            key: "key2"
+            mode: "single"
 
   - platform: template
     name: "KEY2 Double Click"
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data: { key: "key2", mode: "double" }
+          data:
+            key: "key2"
+            mode: "double"
 
   - platform: template
     name: "KEY2 Long Press"
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data: { key: "key2", mode: "long" }
+          data:
+            key: "key2"
+            mode: "long"
 
   - platform: template
     name: "KEY3 Single Click"
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data: { key: "key3", mode: "single" }
+          data:
+            key: "key3"
+            mode: "single"
 
   - platform: template
     name: "KEY3 Double Click"
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data: { key: "key3", mode: "double" }
+          data:
+            key: "key3"
+            mode: "double"
 
   - platform: template
     name: "KEY3 Long Press"
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data: { key: "key3", mode: "long" }
+          data:
+            key: "key3"
+            mode: "long"
 
   - platform: template
     name: "KEY4 Single Click"
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data: { key: "key4", mode: "single" }
+          data:
+            key: "key4"
+            mode: "single"
 
   - platform: template
     name: "KEY4 Double Click"
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data: { key: "key4", mode: "double" }
+          data:
+            key: "key4"
+            mode: "double"
 
   - platform: template
     name: "KEY4 Long Press"
     on_press:
       - homeassistant.event:
           event: esphome.gateway_key
-          data: { key: "key4", mode: "long" }
+          data:
+            key: "key4"
+            mode: "long"
