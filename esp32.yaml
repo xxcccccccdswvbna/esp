@@ -37,164 +37,188 @@ text_sensor:
 
 binary_sensor:
   - platform: gpio
-    pin:
-      number: GPIO0
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO0, mode: INPUT_PULLUP, inverted: true }
     name: GPIO0
+    on_press:
+      - logger.log: "===== GPIO0 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO0 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO2
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO2, mode: INPUT_PULLUP, inverted: true }
     name: GPIO2
+    on_press:
+      - logger.log: "===== GPIO2 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO2 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO4
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO4, mode: INPUT_PULLUP, inverted: true }
     name: GPIO4
+    on_press:
+      - logger.log: "===== GPIO4 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO4 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO5
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO5, mode: INPUT_PULLUP, inverted: true }
     name: GPIO5
+    on_press:
+      - logger.log: "===== GPIO5 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO5 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO12
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO12, mode: INPUT_PULLUP, inverted: true }
     name: GPIO12
+    on_press:
+      - logger.log: "===== GPIO12 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO12 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO13
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO13, mode: INPUT_PULLUP, inverted: true }
     name: GPIO13
+    on_press:
+      - logger.log: "===== GPIO13 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO13 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO14
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO14, mode: INPUT_PULLUP, inverted: true }
     name: GPIO14
+    on_press:
+      - logger.log: "===== GPIO14 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO14 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO15
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO15, mode: INPUT_PULLUP, inverted: true }
     name: GPIO15
+    on_press:
+      - logger.log: "===== GPIO15 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO15 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO16
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO16, mode: INPUT_PULLUP, inverted: true }
     name: GPIO16
+    on_press:
+      - logger.log: "===== GPIO16 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO16 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO17
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO17, mode: INPUT_PULLUP, inverted: true }
     name: GPIO17
+    on_press:
+      - logger.log: "===== GPIO17 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO17 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO18
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO18, mode: INPUT_PULLUP, inverted: true }
     name: GPIO18
+    on_press:
+      - logger.log: "===== GPIO18 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO18 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO19
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO19, mode: INPUT_PULLUP, inverted: true }
     name: GPIO19
+    on_press:
+      - logger.log: "===== GPIO19 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO19 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO21
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO21, mode: INPUT_PULLUP, inverted: true }
     name: GPIO21
+    on_press:
+      - logger.log: "===== GPIO21 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO21 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO22
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO22, mode: INPUT_PULLUP, inverted: true }
     name: GPIO22
+    on_press:
+      - logger.log: "===== GPIO22 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO22 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO23
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO23, mode: INPUT_PULLUP, inverted: true }
     name: GPIO23
+    on_press:
+      - logger.log: "===== GPIO23 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO23 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO25
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO25, mode: INPUT_PULLUP, inverted: true }
     name: GPIO25
+    on_press:
+      - logger.log: "===== GPIO25 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO25 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO26
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO26, mode: INPUT_PULLUP, inverted: true }
     name: GPIO26
+    on_press:
+      - logger.log: "===== GPIO26 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO26 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO27
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO27, mode: INPUT_PULLUP, inverted: true }
     name: GPIO27
+    on_press:
+      - logger.log: "===== GPIO27 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO27 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO32
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO32, mode: INPUT_PULLUP, inverted: true }
     name: GPIO32
+    on_press:
+      - logger.log: "===== GPIO32 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO32 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO33
-      mode: INPUT_PULLUP
-      inverted: true
+    pin: { number: GPIO33, mode: INPUT_PULLUP, inverted: true }
     name: GPIO33
+    on_press:
+      - logger.log: "===== GPIO33 PRESSED ====="
+    on_release:
+      - logger.log: "===== GPIO33 RELEASED ====="
 
   - platform: gpio
-    pin:
-      number: GPIO34
+    pin: GPIO34
     name: GPIO34
+    on_press:
+      - logger.log: "===== GPIO34 HIGH ====="
 
   - platform: gpio
-    pin:
-      number: GPIO35
+    pin: GPIO35
     name: GPIO35
+    on_press:
+      - logger.log: "===== GPIO35 HIGH ====="
 
   - platform: gpio
-    pin:
-      number: GPIO36
+    pin: GPIO36
     name: GPIO36
+    on_press:
+      - logger.log: "===== GPIO36 HIGH ====="
 
   - platform: gpio
-    pin:
-      number: GPIO39
+    pin: GPIO39
     name: GPIO39
+    on_press:
+      - logger.log: "===== GPIO39 HIGH ====="
 
 switch:
   - platform: restart
