@@ -178,7 +178,7 @@ binary_sensor:
     device_class: running
     icon: mdi:fan
 
-  # ================= 物理按键 (已修复 restart 动作) =================
+  # ================= 物理按键 (已使用底层 Lambda 修复重启动作) =================
   
   # KEY1 GPIO34
   - platform: gpio
@@ -198,7 +198,8 @@ binary_sensor:
               then:
                 - logger.log: "KEY1+KEY4 长按8秒，准备恢复出厂"
                 - lambda: 'id(do_factory_reset) = true;'
-                - esp32.restart:  # <--- 修复点：改为 esp32.restart
+                # <--- 修复点：使用底层 C++ 方法重启
+                - lambda: 'App.reboot();' 
               else:
                 - logger.log: "仅KEY1长按，无复位"
                 - lambda: 'id(key_combination_hold) = false;'
@@ -266,8 +267,8 @@ binary_sensor:
                     then:
                       - light.toggle: blue_led
                       - delay: 150ms
-                # <--- 修复点：改为 esp32.restart
-                - esp32.restart: 
+                # <--- 修复点：使用底层 C++ 方法进入安全模式并重启
+                - lambda: 'App.safe_reboot();' 
               else:
                 - delay: 5000ms
                 - if:
