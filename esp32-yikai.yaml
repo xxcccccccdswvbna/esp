@@ -27,13 +27,24 @@ api:
 
 ota:
   - platform: esphome
+    password: "chen1122"
+  - platform: web_server
+
+# Web 控制台 + Web OTA（浏览器访问 http://192.168.6.82）
+web_server:
+  port: 80
+  version: 2
 
 wifi:
   ssid: "CC"
   password: "chen1122"
+  
+  # <--- 新增：当连接不上主 Wi-Fi 时，自动开启的备用热点
+  ap:
+    ssid: "Yeelight Gateway AP"
+    password: "yeelight123"  # 手机连接这个热点时需要的密码
 
 captive_portal:
-web_server:
 
 # ================= BLE 核心配置 =================
 esp32_ble:
