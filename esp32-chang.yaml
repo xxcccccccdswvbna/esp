@@ -1,44 +1,36 @@
 esphome:
   name: esp32-single-core-proxy
   friendly_name: ESP32 Single Core Proxy
-  # 限制日志输出，减轻单核 CPU 负担
   min_version: "2023.8.0" 
 
 esp32:
   board: esp32dev
   framework:
     type: esp-idf
-    # 使用 esp-idf 框架在单核下相对更稳定
 
 # 1. Wi-Fi 配置
 wifi:
-  ssid: "CC"
-  password: "chen1122"
+  ssid: "你的WiFi名称"
+  password: "你的WiFi密码"
   
-  # 开启 AP 备用热点，防止配网失败
   ap:
     ssid: "ESP32 Fallback"
     password: "fallback123"
 
 captive_portal:
 
-# 2. 本地 API (用于 Home Assistant 连接)
+# 2. 本地 API (已关闭加密，避免报错并节省单核资源)
 api:
-  # 建议保留加密，ESPHome 会自动生成或让你输入
-  encryption:
-    key: "在此处填入ESPHome生成的API密钥"
 
 # 3. HTTP OTA 升级配置
 ota:
   - platform: esphome
-    password: "你的OTA升级密码" # 设置一个密码防止被恶意刷写
+    password: "你的OTA升级密码" 
 
-# 开启 Web 服务器，可以通过浏览器 IP:80 查看状态和进行网页端 OTA 升级
 web_server:
   port: 80
 
-# 4. 蓝牙代理配置 (Bluetooth Proxy)
-# 警告：单核 ESP32 运行此项极易崩溃，如遇频繁重启请注释掉以下两部分
+# 4. 蓝牙代理配置
 esp32_ble_tracker:
   scan_parameters:
     interval: 320ms
@@ -48,6 +40,5 @@ esp32_ble_tracker:
 bluetooth_proxy:
   active: true
 
-# 基础日志配置
 logger:
-  level: INFO # 单核设备建议不要使用 DEBUG，以减少 CPU 开销
+  level: INFO
