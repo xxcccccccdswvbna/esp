@@ -15,30 +15,15 @@ ota:
   - platform: esphome
 
 wifi:
-  ssid: "CC"
-  password: "chen1122"
+  ssid: "你的WiFi"
+  password: "你的密码"
 
-  ap:
-    ssid: "ESP32-Fallback"
-    password: "12345678"
-
-captive_portal:
-
-# 板载LED测试
 output:
   - platform: gpio
     pin: GPIO2
-    id: led_output
+    id: led
 
 light:
   - platform: binary
-    name: "ESP32测试灯"
-    output: led_output
-
-sensor:
-  - platform: uptime
-    name: "ESP32运行时间"
-
-  - platform: wifi_signal
-    name: "ESP32 WiFi信号"
-    update_interval: 60s
+    name: "测试LED"
+    output: led
