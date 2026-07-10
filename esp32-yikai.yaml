@@ -12,13 +12,15 @@ esp32:
   flash_size: 4MB
   framework:
     type: esp-idf
-    advanced:
-      sram1_as_iram: true
+    # <--- 警告：必须删除或注释掉 sram1_as_iram: true，否则必崩！
+    # advanced:
+    #   sram1_as_iram: true
     sdkconfig_options:
       CONFIG_FREERTOS_UNICORE: y
 
+# <--- 必须改为 WARN，释放 CPU 和内存
 logger:
-  level: DEBUG
+  level: WARN
 
 api:
   on_client_connected:
@@ -31,7 +33,8 @@ api:
 ota:
   - platform: esphome
     password: "chen1122"
-  - platform: web_server
+  # <--- 建议注释掉网页 OTA，释放大量内存。如果必须用网页 OTA，请关闭下面的 bluetooth_proxy
+  # - platform: web_server
 
 web_server:
   port: 80
