@@ -1,44 +1,44 @@
 esphome:
-  name: esp32-single-core-proxy
-  friendly_name: ESP32 Single Core Proxy
-  min_version: "2023.8.0" 
+  name: esp32-test
+  friendly_name: ESP32 Test
 
 esp32:
   board: esp32dev
   framework:
-    type: esp-idf
+    type: arduino
 
-# 1. Wi-Fi 配置
+logger:
+
+api:
+
+ota:
+  - platform: esphome
+
 wifi:
-  ssid: "你的WiFi名称"
-  password: "你的WiFi密码"
-  
+  ssid: "CC"
+  password: "chen1122"
+
   ap:
-    ssid: "ESP32 Fallback"
-    password: "fallback123"
+    ssid: "ESP32-Fallback"
+    password: "12345678"
 
 captive_portal:
 
-# 2. 本地 API (已关闭加密，避免报错并节省单核资源)
-api:
+# 板载LED测试
+output:
+  - platform: gpio
+    pin: GPIO2
+    id: led_output
 
-# 3. HTTP OTA 升级配置
-ota:
-  - platform: esphome
-    password: "你的OTA升级密码" 
+light:
+  - platform: binary
+    name: "ESP32测试灯"
+    output: led_output
 
-web_server:
-  port: 80
+sensor:
+  - platform: uptime
+    name: "ESP32运行时间"
 
-# 4. 蓝牙代理配置
-esp32_ble_tracker:
-  scan_parameters:
-    interval: 320ms
-    window: 30ms
-    active: true
-
-bluetooth_proxy:
-  active: true
-
-logger:
-  level: INFO
+  - platform: wifi_signal
+    name: "ESP32 WiFi信号"
+    update_interval: 60s
