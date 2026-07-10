@@ -1,0 +1,219 @@
+esphome:
+  name: yeelight-gateway-v3
+  friendly_name: "Yeelight Gateway V3"
+
+esp32:
+  board: esp32dev
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_FREERTOS_UNICORE: y
+
+# 必须降低日志级别，释放内存
+logger:
+  level: WARN
+
+api:
+  # 恢复 HA 连接
+  on_client_connected:
+    - light.turn_off: white_led
+    - light.turn_off: blue_led
+
+ota:
+  - platform: esphome
+    password: "chen1122"
+  # 彻底删除 web_server OTA
+
+wifi:
+  ssid: "CC"
+  password: "chen1122"
+  ap:
+    ssid: "Yeelight Gateway AP"
+    password: "yeelight123"
+
+captive_portal:
+
+# ================= BLE 核心配置 (保留控制灯的功能) =================
+esp32_ble:
+  io_capability: none
+  enable_on_boot: true
+
+esp32_ble_server:
+  id: ble_server
+  manufacturer_data: []
+
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 1000ms
+    window: 50ms
+    active: false
+  on_ble_manufacturer_data_advertise:
+    - manufacturer_id: "134D"
+      then:
+        - lambda: |-
+            if (x.size() < 20) return;
+            if (x[0] != 0x21) return;
+            if (x[2]!=0x48 || x[3]!=0x80 || x[4]!=0x27 || x[5]!=0x70 || x[6]!=0x00 || x[7]!=0x00) return;
+            
+            bool power_on = (x[9] == 0x01);
+            bool fan_running = (x[18] & 0x01);
+            uint8_t fan_gear_idx = x[19];
+            uint16_t brt_raw = (x[14] << 8) | x[15];
+            int brt_pct = (brt_raw == 0xFFFF) ? 100 : (int)(brt_raw / 655.35);
+            
+            id(dev3_power).publish_state(power_on);
+            id(dev3_fan_running).publish_state(fan_running);
+            id(dev3_fan_speed).publish_state(fan_running ? (fan_gear_idx + 1) : 0);
+            id(dev3_brightness).publish_state(brt_pct);
+
+# <--- 彻底删除 bluetooth_proxy，释放大量内存！
+
+# ================= 全局变量与脚本 =================
+globals:
+  - id: pkt_1
+    type: std::vector<uint8_t>
+    initial_value: 'std::vector<uint8_t>{}'
+  - id: pkt_2
+    type: std::vector<uint8_t>
+    initial_value: 'std::vector<uint8_t>{}'
+  - id: last_cmd_time
+    type: uint32_t
+    initial_value: '0'
+
+script:
+  - id: ble_send
+    mode: restart
+    then:
+      - lambda: 'id(ble_server).set_manufacturer_data(id(pkt_1));'
+      - delay: 150ms
+      - lambda: 'id(ble_server).set_manufacturer_data(id(pkt_2));'
+      - delay: 50ms
+      - lambda: 'id(ble_server).set_manufacturer_data({});'
+
+# ================= 传感器 =================
+sensor:
+  - platform: uptime
+    name: Uptime
+  - platform: template
+    name: "Dev3 Fan Speed"
+    id: dev3_fan_speed
+    unit_of_measurement: "档"
+    accuracy_decimals: 0
+    icon: mdi:numeric
+  - platform: template
+    name: "Dev3 Brightness"
+    id: dev3_brightness
+    unit_of_measurement: "%"
+    accuracy_decimals: 0
+    icon: mdi:brightness-percent
+  - platform: wifi_signal
+    name: "WiFi Signal Strength"
+    id: wifi_signal_db
+    update_interval: 60s
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "ESP IP Address"
+
+# ================= 输出与灯光 =================
+output:
+  - platform: gpio
+    id: blue_led_out
+    pin: { number: GPIO27, inverted: true }
+  - platform: gpio
+    id: white_led_out
+    pin: { number: GPIO26, inverted: true }
+
+light:
+  - platform: binary
+    name: Blue LED
+    id: blue_led
+    output: blue_led_out
+    restore_mode: RESTORE_DEFAULT_OFF
+  - platform: binary
+    name: White LED
+    id: white_led
+    output: white_led_out
+    restore_mode: RESTORE_DEFAULT_OFF
+
+# ================= 物理按键与虚拟传感器 =================
+binary_sensor:
+  - platform: template
+    name: "Dev3 Light Power"
+    id: dev3_power
+    device_class: light
+  - platform: template
+    name: "Dev3 Fan Running"
+    id: dev3_fan_running
+    device_class: running
+
+  # 为了保命，这里暂时简化按键逻辑，只保留单击发事件和闪灯
+  - platform: gpio
+    id: key1
+    name: KEY1
+    pin: { number: GPIO34, inverted: true }
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 20ms
+    on_press:
+      then:
+        - light.turn_on: blue_led
+        - delay: 200ms
+        - light.turn_off: blue_led
+        - homeassistant.event:
+            event: esphome.gateway_key
+            data: { key: "key1", mode: "single" }
+
+  - platform: gpio
+    id: key2
+    name: KEY2
+    pin: { number: GPIO35, inverted: true }
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 20ms
+    on_press:
+      then:
+        - light.turn_on: blue_led
+        - delay: 200ms
+        - light.turn_off: blue_led
+        - homeassistant.event:
+            event: esphome.gateway_key
+            data: { key: "key2", mode: "single" }
+
+  - platform: gpio
+    id: key3
+    name: KEY3
+    pin: { number: GPIO32, inverted: true }
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 20ms
+    on_press:
+      then:
+        - light.turn_on: blue_led
+        - delay: 200ms
+        - light.turn_off: blue_led
+        - homeassistant.event:
+            event: esphome.gateway_key
+            data: { key: "key3", mode: "single" }
+
+  - platform: gpio
+    id: key4
+    name: KEY4
+    pin: { number: GPIO33, inverted: true }
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 20ms
+    on_press:
+      then:
+        - light.turn_on: blue_led
+        - delay: 200ms
+        - light.turn_off: blue_led
+        - homeassistant.event:
+            event: esphome.gateway_key
+            data: { key: "key4", mode: "single" }
+
+# ================= 下拉选择框与按钮 (保留核心控制) =================
+# 请将您之前完整的 select 和 button 代码粘贴到这里
+# (注意：如果粘贴后再次崩溃，说明 select/button 太多也吃内存，需要进一步删减)
