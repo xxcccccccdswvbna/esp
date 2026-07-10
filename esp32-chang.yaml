@@ -15,8 +15,12 @@ ota:
   - platform: esphome
 
 wifi:
-  ssid: "你的WiFi"
-  password: "你的密码"
+  ssid: "CC"
+  password: "chen1122"
+  
+web_server:
+  port: 80
+  version:   
 
 output:
   - platform: gpio
