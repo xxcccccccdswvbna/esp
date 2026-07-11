@@ -120,6 +120,12 @@ script:
 sensor:
   - platform: uptime
     name: Uptime
+  - platform: internal_temperature
+    name: "ESP32 Chip Temperature"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    icon: mdi:thermometer-chip
+    update_interval: 60s     
   - platform: template
     name: "Dev3 Fan Speed"
     id: dev3_fan_speed
