@@ -16,8 +16,10 @@ esp32:
       CONFIG_FREERTOS_UNICORE: y
 
 logger:
+  baud_rate: 0
 
 api:
+  reboot_timeout: 0s
   on_client_connected:
     - script.stop: offline_flash
     - light.turn_off: white_led
@@ -31,6 +33,8 @@ ota:
 wifi:
   ssid: "CC"
   password: "chen1122"
+  fast_connect: true
+  power_save_mode: none
 
   ap:
     ssid: "CT1 Fallback"
@@ -580,111 +584,3 @@ button:
           id(pkt_2)={0x11,0x4D,0x19,0x1A,0xF0,0xCF,0x2D,0x70,0x00,0x00,0x01,0x2C,0x2D,0x70,0x70,0x00,0x5C,0xBF,0x1D,0x60,0xF0,0xF0,0xFC,0x3F,0xCF,0xCD};
       - script.execute: ble_send
 
-  # 3. 新增的 KEY1~KEY4 模拟按键 (用于在 HA 中直接调用)
-  - platform: template
-    name: "KEY1 Single Click"
-    on_press:
-      - homeassistant.event:
-          event: esphome.gateway_key
-          data:
-            key: "key1"
-            mode: "single"
-
-  - platform: template
-    name: "KEY1 Double Click"
-    on_press:
-      - homeassistant.event:
-          event: esphome.gateway_key
-          data:
-            key: "key1"
-            mode: "double"
-
-  - platform: template
-    name: "KEY1 Long Press"
-    on_press:
-      - homeassistant.event:
-          event: esphome.gateway_key
-          data:
-            key: "key1"
-            mode: "long"
-
-  - platform: template
-    name: "KEY2 Single Click"
-    on_press:
-      - homeassistant.event:
-          event: esphome.gateway_key
-          data:
-            key: "key2"
-            mode: "single"
-
-  - platform: template
-    name: "KEY2 Double Click"
-    on_press:
-      - homeassistant.event:
-          event: esphome.gateway_key
-          data:
-            key: "key2"
-            mode: "double"
-
-  - platform: template
-    name: "KEY2 Long Press"
-    on_press:
-      - homeassistant.event:
-          event: esphome.gateway_key
-          data:
-            key: "key2"
-            mode: "long"
-
-  - platform: template
-    name: "KEY3 Single Click"
-    on_press:
-      - homeassistant.event:
-          event: esphome.gateway_key
-          data:
-            key: "key3"
-            mode: "single"
-
-  - platform: template
-    name: "KEY3 Double Click"
-    on_press:
-      - homeassistant.event:
-          event: esphome.gateway_key
-          data:
-            key: "key3"
-            mode: "double"
-
-  - platform: template
-    name: "KEY3 Long Press"
-    on_press:
-      - homeassistant.event:
-          event: esphome.gateway_key
-          data:
-            key: "key3"
-            mode: "long"
-
-  - platform: template
-    name: "KEY4 Single Click"
-    on_press:
-      - homeassistant.event:
-          event: esphome.gateway_key
-          data:
-            key: "key4"
-            mode: "single"
-
-  - platform: template
-    name: "KEY4 Double Click"
-    on_press:
-      - homeassistant.event:
-          event: esphome.gateway_key
-          data:
-            key: "key4"
-            mode: "double"
-
-  - platform: template
-    name: "KEY4 Long Press"
-    on_press:
-      - homeassistant.event:
-          event: esphome.gateway_key
-          data:
-            key: "key4"
-            mode: "long"
