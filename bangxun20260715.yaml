@@ -1,6 +1,11 @@
 esphome:
-  name: bangxun
-  friendly_name: 邦训小萌1s
+  name: ee
+  friendly_name: 邦讯小萌1s
+
+  on_boot:
+    priority: 600
+    then:
+      - script.execute: startup_control
 
 esp8266:
   board: esp01_1m
@@ -20,12 +25,16 @@ wifi:
   password: "chen1122"
   min_auth_mode: WPA2
   reboot_timeout: 0s
-  fast_connect: true
+
   ap:
     ssid: "EE-Setup"
     password: "12345678"
 
 captive_portal:
+
+web_server:
+  port: 80
+
 
 mqtt:
   broker: bemfa.com
@@ -36,22 +45,41 @@ mqtt:
   keepalive: 30s
   discovery: false
 
-  birth_message:
-    topic: plug001/up
-    payload: online
-
-  will_message:
-    topic: plug001/up
-    payload: offline
+  on_connect:
+    then:
+      - if:
+          condition:
+            switch.is_on: relay
+          then:
+            - mqtt.publish:
+                topic: plug001/up
+                payload: "on"
+      - if:
+          condition:
+            switch.is_off: relay
+          then:
+            - mqtt.publish:
+                topic: plug001/up
+                payload: "off"
 
   on_message:
     - topic: plug001
       then:
         - lambda: |-
-            if (x == "on" || x == "ON" || x == "1")
+            if (x == "on" || x == "ON" || x == "1") {
               id(relay).turn_on();
-            else if (x == "off" || x == "OFF" || x == "0")
+            }
+            else if (x == "off" || x == "OFF" || x == "0") {
               id(relay).turn_off();
+            }
+
+
+globals:
+  - id: off_timer
+    type: int
+    restore_value: no
+    initial_value: '0'
+
 
 binary_sensor:
   - platform: gpio
@@ -60,50 +88,106 @@ binary_sensor:
     pin:
       number: GPIO14
       mode: INPUT_PULLUP
+
     filters:
       - invert:
       - delayed_on: 50ms
       - delayed_off: 50ms
+
     on_press:
       - switch.toggle: relay
+
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (id(off_timer) > 0) {
+            id(off_timer)--;
+
+            if (id(off_timer) <= 0) {
+              id(relay).turn_off();
+            }
+          }
+
 
 switch:
   - platform: gpio
     id: relay
     name: "插座开关"
+
     pin: GPIO15
+
     restore_mode: RESTORE_DEFAULT_OFF
+
     on_turn_on:
       - switch.turn_on: relay_led
       - mqtt.publish:
-          topic: plug001/up
-          payload: on
+          topic: plug001/set
+          payload: "on"
+
     on_turn_off:
       - switch.turn_off: relay_led
       - mqtt.publish:
-          topic: plug001/up
-          payload: off
+          topic: plug001/set
+          payload: "off"
+
 
   - platform: gpio
     id: relay_led
-    name: "继电器指示灯"
+    internal: true
+
     pin:
       number: GPIO12
       inverted: true
-    restore_mode: RESTORE_DEFAULT_ON
+
 
   - platform: gpio
     id: wifi_led
+
     name: "WiFi状态灯"
+
     pin:
       number: GPIO13
       inverted: true
+
     restore_mode: RESTORE_DEFAULT_ON
+number:
+  - platform: template
+    id: startup_delay
+    name: "开机延迟秒数"
+    min_value: 0
+    max_value: 600
+    step: 1
+    restore_value: true
+    optimistic: true
+
+
+script:
+  - id: startup_control
+    mode: restart
+    then:
+      - delay: !lambda |-
+          return (int)(id(startup_delay).state * 1000);
+      - switch.turn_on: relay
+
 
 sensor:
   - platform: wifi_signal
+    id: wifi_db
     name: "WiFi信号"
     update_interval: 60s
+
+
+  - platform: template
+    name: "WiFi质量"
+    lambda: |-
+      float x = id(wifi_db).state;
+      if (x <= -100) return 0;
+      if (x >= -50) return 100;
+      return 2 * (x + 100);
+    unit_of_measurement: "%"
+
 
   - platform: template
     name: "剩余内存"
@@ -112,21 +196,61 @@ sensor:
     unit_of_measurement: "B"
     update_interval: 60s
 
+
   - platform: uptime
     name: "运行时间"
     update_interval: 60s
+
+
+  - platform: template
+    name: "剩余倒计时"
+    lambda: |-
+      return id(off_timer);
+    unit_of_measurement: "s"
+    update_interval: 1s
+
 
 text_sensor:
   - platform: wifi_info
     ip_address:
       name: "设备IP"
 
-  - platform: template
-    name: "重启原因"
-    lambda: |-
-      return std::string(ESP.getResetReason().c_str());
-    update_interval: never
 
 button:
   - platform: restart
     name: "重启设备"
+
+
+  - platform: template
+    name: "30分钟关闭"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 30 * 60;
+
+
+  - platform: template
+    name: "1小时关闭"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 60 * 60;
+
+
+  - platform: template
+    name: "2小时关闭"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 120 * 60;
+
+
+  - platform: template
+    name: "4小时关闭"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 240 * 60;
+
+
+  - platform: template
+    name: "取消倒计时"
+    on_press:
+      - lambda: |-
+          id(off_timer) = 0;
