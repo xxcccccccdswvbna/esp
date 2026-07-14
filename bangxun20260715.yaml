@@ -1,6 +1,9 @@
 esphome:
   name: bangxun
-  friendly_name: bangxun
+  friendly_name: 邦讯小萌1s
+
+  includes:
+    - user_interface.h
 
 esp8266:
   board: esp01_1m
@@ -15,130 +18,217 @@ ota:
   - platform: esphome
     password: "chen1122"
 
+
 wifi:
   ssid: "CC"
   password: "chen1122"
+
   min_auth_mode: WPA2
+
   reboot_timeout: 0s
+
   fast_connect: true
 
   ap:
     ssid: "EE-Setup"
     password: "12345678"
 
+
 captive_portal:
+
 
 web_server:
   port: 80
 
+
+
 mqtt:
   broker: bemfa.com
   port: 9501
+
   username: "97109945d7e24559b3e4ca7a1f8ef160"
   password: "97109945d7e24559b3e4ca7a1f8ef160"
+
   client_id: "97109945d7e24559b3e4ca7a1f8ef160"
+
   keepalive: 30s
+
   discovery: false
+
 
   birth_message:
     topic: plug001/up
     payload: "online"
 
+
   will_message:
     topic: plug001/up
     payload: "offline"
 
+
   on_connect:
     then:
+
       - if:
+
           condition:
+
             switch.is_on: relay
+
+
           then:
+
             - mqtt.publish:
+
                 topic: plug001/up
                 payload: "on"
+
+
           else:
+
             - mqtt.publish:
+
                 topic: plug001/up
                 payload: "off"
 
+
+
   on_message:
+
     - topic: plug001
+
       then:
+
         - lambda: |-
+
             if (x == "on" || x == "ON" || x == "1") {
+
               id(relay).turn_on();
+
             }
+
             else if (x == "off" || x == "OFF" || x == "0") {
+
               id(relay).turn_off();
+
             }
+
 
 
 binary_sensor:
+
   - platform: gpio
+
     id: button_input
+
     internal: true
+
     pin:
+
       number: GPIO14
+
       mode: INPUT_PULLUP
 
+
     filters:
+
       - invert:
+
       - delayed_on: 50ms
+
       - delayed_off: 50ms
 
+
     on_press:
+
       - switch.toggle: relay
+
+
 
 
 switch:
 
+
   - platform: gpio
+
     id: relay
+
     name: "插座开关"
 
     pin: GPIO15
 
+
     restore_mode: RESTORE_DEFAULT_OFF
 
+
     on_turn_on:
+
       - switch.turn_on: relay_led
+
       - mqtt.publish:
+
           topic: plug001/up
+
           payload: "on"
 
+
+
     on_turn_off:
+
       - switch.turn_off: relay_led
+
       - mqtt.publish:
+
           topic: plug001/up
+
           payload: "off"
 
 
+
+
   - platform: gpio
+
     id: relay_led
+
     internal: true
 
+
     pin:
+
       number: GPIO12
+
       inverted: true
 
 
+
+
+
   - platform: gpio
+
     id: wifi_led
 
     name: "WiFi状态灯"
 
+
     pin:
+
       number: GPIO13
+
       inverted: true
+
 
     restore_mode: RESTORE_DEFAULT_ON
 
 
 
+
+
+
 sensor:
 
+
   - platform: wifi_signal
+
     id: wifi_db
 
     name: "WiFi信号强度"
@@ -146,32 +236,50 @@ sensor:
     update_interval: 60s
 
 
+
+
+
   - platform: template
 
     name: "WiFi质量"
 
+
     lambda: |-
+
       float x = id(wifi_db).state;
 
+
       if (x <= -100)
+
         return 0;
 
+
       if (x >= -50)
+
         return 100;
 
+
       return 2 * (x + 100);
+
+
 
     unit_of_measurement: "%"
 
     update_interval: 60s
 
 
+
+
+
   - platform: template
 
     name: "剩余内存"
 
+
     lambda: |-
+
       return ESP.getFreeHeap();
+
 
     unit_of_measurement: "B"
 
@@ -179,18 +287,26 @@ sensor:
 
 
 
+
+
+
   - platform: template
 
     name: "ESP8266芯片温度"
 
+
     lambda: |-
-      return ESP.getChipTemperature();
+
+      return system_get_chip_temp();
+
 
     unit_of_measurement: "°C"
 
     accuracy_decimals: 1
 
     update_interval: 60s
+
+
 
 
 
@@ -202,26 +318,41 @@ sensor:
 
 
 
+
+
+
+
 text_sensor:
+
 
   - platform: wifi_info
 
     ip_address:
+
       name: "设备 IP 地址"
+
+
 
 
   - platform: template
 
     name: "重启原因"
 
+
     lambda: |-
-      return ESP.getResetReason();
+
+      return std::string(ESP.getResetReason().c_str());
+
 
     update_interval: never
 
 
 
+
+
+
 button:
+
 
   - platform: restart
 
