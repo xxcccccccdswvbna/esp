@@ -5,26 +5,20 @@ esphome:
   project:
     name: "HA-DIYer.SmarOutlet-V1"
     version: "1.1.4"
-  on_boot:
-    priority: -100
-    then:
-      - delay: 3s
-      - button.press: ld2412_restart   # 上电稳定后重启一次雷达
 
 esp32:
   board: esp32dev
   framework:
     type: esp-idf
 
-# 关闭串口日志, 让出 UART0 (GPIO1/GPIO3) 给雷达
 logger:
   baud_rate: 0
 
 api:
-ota:
-  - platform: esphome    
-  - platform: web_server   
 
+ota:
+  - platform: esphome
+  - platform: web_server
 
 web_server:
   port: 80
@@ -38,15 +32,12 @@ wifi:
 captive_portal:
 
 substitutions:
-  led_pin:       GPIO27
-  button_pin:    GPIO0
-  relay_a_pin:   GPIO26
-  relay_b_pin:   GPIO25
+  led_pin: GPIO27
+  button_pin: GPIO0
+  relay_a_pin: GPIO26
+  relay_b_pin: GPIO25
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
-  # LD2412 物理接线 (交叉): ESP.TX(GPIO3) ↔ LD.RX  |  ESP.RX(GPIO1) ↔ LD.TX
-  ld2412_tx_pin: GPIO1
-  ld2412_rx_pin: GPIO3
 
 globals:
   - id: var_energy
@@ -70,7 +61,6 @@ globals:
     restore_value: yes
     initial_value: '0'
 
-# ⭐ 关键: 用硬件 UART 而非 software_uart, 115200 才稳
 uart:
   - id: uart_bl0940
     tx_pin: $bl0940_tx_pin
@@ -78,16 +68,15 @@ uart:
     baud_rate: 4800
     stop_bits: 1
 
-  - id: uart_ld2412
-    tx_pin: $ld2412_tx_pin
-    rx_pin: $ld2412_rx_pin
-    baud_rate: 115200
-    parity: NONE
-    stop_bits: 1
-    rx_buffer_size: 512     # 加大缓冲, 防止 WiFi 忙时丢帧
+# 保留你能工作的 software_uart 配置 (物理接线反向)
+software_uart:
+  id: sw_uart_ld2412
+  rx_pin: GPIO1
+  tx_pin: GPIO3
+  baud_rate: 115200
 
 ld2412:
-  uart_id: uart_ld2412
+  uart_id: sw_uart_ld2412
 
 output:
   - platform: gpio
@@ -111,12 +100,12 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - output.turn_off: relay_a_pin_output
-      - output.turn_on:  relay_b_pin_output
+      - output.turn_on: relay_b_pin_output
       - delay: 100ms
       - output.turn_off: relay_b_pin_output
     turn_off_action:
       - output.turn_off: relay_b_pin_output
-      - output.turn_on:  relay_a_pin_output
+      - output.turn_on: relay_a_pin_output
       - delay: 100ms
       - output.turn_off: relay_a_pin_output
 
@@ -126,7 +115,7 @@ switch:
 
   - platform: ld2412
     engineering_mode: { name: "LD2412 工程模式 Eng", id: ld2412_eng_mode }
-    bluetooth:        { name: "LD2412 蓝牙控制 BT", id: ld2412_bluetooth }
+    bluetooth: { name: "LD2412 蓝牙控制 BT", id: ld2412_bluetooth }
 
 binary_sensor:
   - platform: gpio
@@ -153,15 +142,15 @@ binary_sensor:
       on_release:
         - lambda: 'id(last_presence_seconds) = id(current_presence_seconds);'
     has_moving_target: { name: "LD2412 微动 Moving", id: ld2412_moving }
-    has_still_target:  { name: "LD2412 静止 Still",  id: ld2412_still }
+    has_still_target: { name: "LD2412 静止 Still", id: ld2412_still }
 
 sensor:
   - platform: bl0940
     uart_id: uart_bl0940
     voltage: { name: 'Voltage', accuracy_decimals: 0 }
     current: { name: 'Current' }
-    power:   { name: 'Power',   accuracy_decimals: 1 }
-    energy:  { name: 'Energy',  accuracy_decimals: 3, id: bl0940_energy }
+    power: { name: 'Power', accuracy_decimals: 1 }
+    energy: { name: 'Energy', accuracy_decimals: 3, id: bl0940_energy }
     read_command: 0x58
     write_command: 0xA8
     legacy_mode: false
@@ -184,16 +173,15 @@ sensor:
       return id(bl0940_energy).state - id(var_energy);
 
   - platform: ld2412
-    moving_distance:    { name: "LD2412 运动距离 MDist", id: ld2412_moving_dist }
-    still_distance:     { name: "LD2412 静止距离 SDist", id: ld2412_still_dist }
-    moving_energy:      { name: "LD2412 运动能量 MEnergy", id: ld2412_moving_energy }
-    still_energy:       { name: "LD2412 静止能量 SEnergy", id: ld2412_still_energy }
-    detection_distance: { name: "LD2412 检测距离 Det",   id: ld2412_det_dist }
-    light:              { name: "LD2412 光照度 Lux",     id: ld2412_light }
+    moving_distance: { name: "LD2412 运动距离 MDist", id: ld2412_moving_dist }
+    still_distance: { name: "LD2412 静止距离 SDist", id: ld2412_still_dist }
+    moving_energy: { name: "LD2412 运动能量 MEnergy", id: ld2412_moving_energy }
+    still_energy: { name: "LD2412 静止能量 SEnergy", id: ld2412_still_energy }
+    detection_distance: { name: "LD2412 检测距离 Det", id: ld2412_det_dist }
+    light: { name: "LD2412 光照度 Lux", id: ld2412_light }
 
   - platform: template
     name: "当前有人时长 P_Curr"
-    id: sensor_curr_presence
     unit_of_measurement: "s"
     accuracy_decimals: 0
     update_interval: 1s
@@ -224,22 +212,29 @@ sensor:
     name: "WiFi RSSI"
     update_interval: 60s
 
+  - platform: internal_temperature
+    name: "ESP32 Chip Temperature"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    update_interval: 60s
+
   - platform: uptime
     name: "Uptime"
+    id: sensor_uptime
     update_interval: 60s
 
 number:
   - platform: bl0940
     current_calibration: { name: Current Calibration }
     voltage_calibration: { name: Voltage Calibration }
-    power_calibration:   { name: Power Calibration }
-    energy_calibration:  { name: Energy Calibration }
+    power_calibration: { name: Power Calibration }
+    energy_calibration: { name: Energy Calibration }
 
   - platform: ld2412
-    timeout:           { name: "LD2412 存在超时 Timeout",  id: ld2412_timeout }
+    timeout: { name: "LD2412 存在超时 Timeout", id: ld2412_timeout }
     min_distance_gate: { name: "LD2412 最小距离门 MinGate", id: ld2412_min_gate }
     max_distance_gate: { name: "LD2412 最大距离门 MaxGate", id: ld2412_max_gate }
-    light_threshold:   { name: "LD2412 光照阈值 Thresh",   id: ld2412_light_thresh }
+    light_threshold: { name: "LD2412 光照阈值 Thresh", id: ld2412_light_thresh }
 
 button:
   - platform: bl0940
@@ -250,15 +245,41 @@ button:
     id: btn_factory_reset
   - platform: ld2412
     factory_reset: { name: "LD2412 恢复出厂 Reset", id: ld2412_factory_reset }
-    restart:       { name: "LD2412 重启雷达 Restart", id: ld2412_restart }
-    query_params:  { name: "LD2412 查询参数 Query",   id: ld2412_query }
+    restart: { name: "LD2412 重启雷达 Restart", id: ld2412_restart }
+    query_params: { name: "LD2412 查询参数 Query", id: ld2412_query }
 
 text_sensor:
   - platform: ld2412
-    version:     { name: "LD2412 固件版本 Ver", id: ld2412_version }
+    version: { name: "LD2412 固件版本 Ver", id: ld2412_version }
     mac_address: { name: "LD2412 MAC地址 MAC", id: ld2412_mac }
+
   - platform: version
     name: "ESPHome Version"
+
+  # WiFi 信息
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+    ssid:
+      name: "Connected SSID"
+    bssid:
+      name: "Connected BSSID"
+    mac_address:
+      name: "MAC Address"
+
+  # 开机时长文本
+  - platform: template
+    name: "Uptime Human"
+    id: uptime_human
+    update_interval: 60s
+    lambda: |-
+      uint32_t dur = (uint32_t) id(sensor_uptime).state;
+      int days  = dur / 86400;  dur %= 86400;
+      int hours = dur / 3600;   dur %= 3600;
+      int mins  = dur / 60;
+      char buf[32];
+      snprintf(buf, sizeof(buf), "%dd %02dh %02dm", days, hours, mins);
+      return { std::string(buf) };
 
 time:
   - platform: homeassistant
@@ -285,14 +306,11 @@ interval:
                 id(current_absence_seconds)++;
                 id(current_presence_seconds) = 0;
 
-  # 雷达看门狗: 运行 5 分钟以后, 如果检测距离持续 NaN 才重启
   - interval: 5min
     then:
       - if:
           condition:
-            and:
-              - lambda: 'return isnan(id(ld2412_det_dist).state);'
-              - lambda: 'return millis() > 5UL * 60UL * 1000UL;'
+            lambda: 'return isnan(id(ld2412_det_dist).state);'
           then:
-            - logger.log: "LD2412 no data, restarting"
+            - logger.log: "LD2412 Restart"
             - button.press: ld2412_restart
