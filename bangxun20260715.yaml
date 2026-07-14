@@ -9,7 +9,6 @@ esp8266:
 logger:
   baud_rate: 0
 
-# 如果不需要 Home Assistant 本地集成，强烈建议注释掉 api 以节省内存
 api:
 
 ota:
@@ -22,8 +21,7 @@ wifi:
   min_auth_mode: WPA2
   reboot_timeout: 0s
   fast_connect: true
-  
-  # Fallback 热点 (WiFi 断线恢复机制)
+
   ap:
     ssid: "EE-Setup"
     password: "12345678"
@@ -36,21 +34,20 @@ web_server:
 mqtt:
   broker: bemfa.com
   port: 9501
-  username: "97109945d7e24559b3e4ca7a1f8ef160"   # <--- 替换为你的私钥
-  password: "97109945d7e24559b3e4ca7a1f8ef160"   # <--- 替换为你的私钥
-  client_id: "97109945d7e24559b3e4ca7a1f8ef160"  # <--- 替换为你的私钥
-  keepalive: 30s 
+  username: "97109945d7e24559b3e4ca7a1f8ef160"
+  password: "97109945d7e24559b3e4ca7a1f8ef160"
+  client_id: "97109945d7e24559b3e4ca7a1f8ef160"
+  keepalive: 30s
   discovery: false
-  
-  # 在线状态 (出生与遗嘱消息)
+
   birth_message:
     topic: plug001/up
     payload: "online"
+
   will_message:
     topic: plug001/up
     payload: "offline"
 
-  # 连接成功时同步状态
   on_connect:
     then:
       - if:
@@ -65,18 +62,18 @@ mqtt:
                 topic: plug001/up
                 payload: "off"
 
-  # 接收控制指令
   on_message:
     - topic: plug001
       then:
         - lambda: |-
             if (x == "on" || x == "ON" || x == "1") {
               id(relay).turn_on();
-            } else if (x == "off" || x == "OFF" || x == "0") {
+            }
+            else if (x == "off" || x == "OFF" || x == "0") {
               id(relay).turn_off();
             }
 
-# 物理按键
+
 binary_sensor:
   - platform: gpio
     id: button_input
@@ -84,19 +81,24 @@ binary_sensor:
     pin:
       number: GPIO14
       mode: INPUT_PULLUP
+
     filters:
       - invert:
       - delayed_on: 50ms
       - delayed_off: 50ms
+
     on_press:
       - switch.toggle: relay
 
-# 开关控制 (保留原有指示灯逻辑)
+
 switch:
+
   - platform: gpio
     id: relay
     name: "插座开关"
+
     pin: GPIO15
+
     restore_mode: RESTORE_DEFAULT_OFF
 
     on_turn_on:
@@ -111,75 +113,116 @@ switch:
           topic: plug001/up
           payload: "off"
 
-  # 继电器指示灯 (GPIO12)
+
   - platform: gpio
     id: relay_led
     internal: true
+
     pin:
       number: GPIO12
       inverted: true
 
-  # WiFi 状态灯 (GPIO13)
+
   - platform: gpio
     id: wifi_led
+
     name: "WiFi状态灯"
+
     pin:
       number: GPIO13
       inverted: true
+
     restore_mode: RESTORE_DEFAULT_ON
 
-# 传感器与系统监控
+
+
 sensor:
+
   - platform: wifi_signal
     id: wifi_db
+
     name: "WiFi信号强度"
+
     update_interval: 60s
 
+
   - platform: template
+
     name: "WiFi质量"
+
     lambda: |-
       float x = id(wifi_db).state;
-      if (x <= -100) return 0;
-      if (x >= -50) return 100;
+
+      if (x <= -100)
+        return 0;
+
+      if (x >= -50)
+        return 100;
+
       return 2 * (x + 100);
+
     unit_of_measurement: "%"
+
     update_interval: 60s
 
+
   - platform: template
+
     name: "剩余内存"
+
     lambda: |-
       return ESP.getFreeHeap();
+
     unit_of_measurement: "B"
+
     update_interval: 60s
 
+
+
   - platform: template
-    name: "ESP8266 芯片温度"
+
+    name: "ESP8266芯片温度"
+
     lambda: |-
-      // 使用 ESP8266 SDK 提供的内部温度读取方式
-      return system_get_chip_temp();
+      return ESP.getChipTemperature();
+
     unit_of_measurement: "°C"
+
     accuracy_decimals: 1
+
     update_interval: 60s
+
+
 
   - platform: uptime
+
     name: "设备运行时间"
+
     update_interval: 60s
 
-# 文本传感器 (IP 信息与重启原因)
+
+
 text_sensor:
+
   - platform: wifi_info
+
     ip_address:
       name: "设备 IP 地址"
-    update_interval: 60s  # 修正：将 update_interval 移到 ip_address 同级
-      
+
+
   - platform: template
+
     name: "重启原因"
+
     lambda: |-
       return ESP.getResetReason();
+
     update_interval: never
 
 
-# 按钮
+
 button:
+
   - platform: restart
+
     name: "重启设备"
