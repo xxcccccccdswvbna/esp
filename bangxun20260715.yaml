@@ -129,11 +129,12 @@ switch:
 sensor:
   - platform: wifi_signal
     id: wifi_db
-    name: "WiFi信号_WiFiSignal"
+    name: WiFi信号_WiFiSignal
     update_interval: 60s
 
   - platform: template
-    name: "WiFi质量_WiFiQuality"
+    id: wifi_quality
+    name: WiFi质量_WiFiQuality
     lambda: |-
       float x = id(wifi_db).state;
       if (x <= -100) return 0;
@@ -141,17 +142,18 @@ sensor:
       return 2 * (x + 100);
     unit_of_measurement: "%"
 
-   - platform: template
-    name: "剩余内存_FreeHeap"
+  - platform: template
+    id: free_heap
+    name: 剩余内存_FreeHeap
     lambda: |-
       return ESP.getFreeHeap();
     unit_of_measurement: "B"
     update_interval: 60s
 
   - platform: uptime
-    name: "运行时间_Uptime"
+    id: uptime_sensor
+    name: 运行时间_Uptime
     update_interval: 60s
-
 
 text_sensor:
   - platform: wifi_info
