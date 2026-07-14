@@ -69,8 +69,8 @@ uart:
     stop_bits: 1
 
   - id: uart_ld2412
-    tx_pin: GPIO3
-    rx_pin: GPIO1
+    tx_pin: GPIO1
+    rx_pin: GPIO3
     baud_rate: 115200
     parity: NONE
     stop_bits: 1
