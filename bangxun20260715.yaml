@@ -152,15 +152,16 @@ sensor:
 # 文本传感器 (IP 信息与重启原因)
 text_sensor:
   - platform: wifi_info
+    update_interval: 60s  # ✅ 修正：放在这里，与 ip_address 同级
     ip_address:
       name: "设备 IP 地址"
-      update_interval: 60s
 
   - platform: template
     name: "重启原因"
     lambda: |-
       return std::string(ESP.getResetReason().c_str());
     update_interval: never
+
 
 # 按钮
 button:
