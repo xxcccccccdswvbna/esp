@@ -45,8 +45,8 @@ substitutions:
   bl0940_tx_pin: GPIO21
   bl0940_rx_pin: GPIO5
   # LD2412 物理接线 (交叉): ESP.TX(GPIO3) ↔ LD.RX  |  ESP.RX(GPIO1) ↔ LD.TX
-  ld2412_tx_pin: GPIO3
-  ld2412_rx_pin: GPIO1
+  ld2412_tx_pin: GPIO1
+  ld2412_rx_pin: GPIO3
 
 globals:
   - id: var_energy
