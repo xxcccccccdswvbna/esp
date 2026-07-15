@@ -2,6 +2,11 @@ esphome:
   name: ee
   friendly_name: 邦训小萌1s
 
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: update_leds
+
 esp8266:
   board: esp01_1m
   restore_from_flash: true
@@ -20,6 +25,7 @@ wifi:
   password: "chen1122"
   min_auth_mode: WPA2
   reboot_timeout: 0s
+
   ap:
     ssid: "EE-Setup"
     password: "12345678"
@@ -29,12 +35,15 @@ captive_portal:
 web_server:
   port: 80
 
+
 mqtt:
   broker: bemfa.com
   port: 9501
+
   username: "97109945d7e24559b3e4ca7a1f8ef160"
   password: "97109945d7e24559b3e4ca7a1f8ef160"
   client_id: "97109945d7e24559b3e4ca7a1f8ef160"
+
   keepalive: 30s
   discovery: false
 
@@ -46,6 +55,7 @@ mqtt:
     topic: plug001/up
     payload: "offline"
 
+
   on_connect:
     then:
       - if:
@@ -55,13 +65,13 @@ mqtt:
             - mqtt.publish:
                 topic: plug001/up
                 payload: "on"
-      - if:
-          condition:
-            switch.is_off: relay
-          then:
+          else:
             - mqtt.publish:
                 topic: plug001/up
                 payload: "off"
+
+      - script.execute: update_leds
+
 
   on_message:
     - topic: plug001
@@ -69,142 +79,329 @@ mqtt:
         - lambda: |-
             if (x == "on" || x == "ON" || x == "1") {
               id(relay).turn_on();
-            } else if (x == "off" || x == "OFF" || x == "0") {
+            }
+
+            else if (x == "off" || x == "OFF" || x == "0") {
               id(relay).turn_off();
             }
 
-# ================= 核心控制区：单一脚本 + Output 架构 =================
 
-# 1. 底层输出：纯粹控制 GPIO 引脚
+
+# ==========================
+# LED状态保存
+# ==========================
+
+globals:
+
+  # GPIO12 继电器灯允许
+  - id: relay_led_enable
+    type: bool
+    restore_value: yes
+    initial_value: "true"
+
+
+  # GPIO13 WiFi灯允许
+  - id: wifi_led_enable
+    type: bool
+    restore_value: yes
+    initial_value: "true"
+
+
+
+# ==========================
+# LED底层输出
+# ==========================
+
 output:
-  # 继电器指示灯
+
   - platform: gpio
     id: relay_led_output
     pin:
       number: GPIO12
-      inverted: true  # 【关键修复】：加上这个，turn_on 时就会输出低电平点亮灯
-      
-  # WiFi 状态灯
+      inverted: true
+
+
   - platform: gpio
     id: wifi_led_output
     pin:
       number: GPIO13
-      inverted: true  # WiFi灯也是低电平点亮，同样加上 inverted
+      inverted: true
 
-# 2. 唯一更新 LED 状态的脚本（所有状态同步都在这里完成）
+
+
+# ==========================
+# LED统一管理
+# ==========================
+
 script:
-  - id: update_relay_led
+
+  - id: update_leds
     mode: restart
+
     then:
+
+      # 继电器指示灯
       - if:
           condition:
             lambda: |-
-              return id(relay).state && id(relay_led_enable).state;
-          then:
-            # 条件满足时，同时点亮继电器灯和WiFi灯
-            - output.turn_on: relay_led_output
-            - output.turn_on: wifi_led_output
-          else:
-            # 条件不满足时，同时熄灭继电器灯和WiFi灯
-            - output.turn_off: relay_led_output
-            - output.turn_off: wifi_led_output
+              return id(relay_led_enable)
+                     && id(relay).state;
 
-# 3. 开关实体定义
+          then:
+            - output.turn_on: relay_led_output
+
+          else:
+            - output.turn_off: relay_led_output
 switch:
-  # 插座开关
+
+  # =====================
+  # 插座继电器 GPIO15
+  # =====================
+
   - platform: gpio
     id: relay
     name: "插座开关"
     pin: GPIO15
 
     on_turn_on:
-      - script.execute: update_relay_led
+      - script.execute: update_leds
+
       - mqtt.publish:
           topic: plug001/set
           payload: "on"
 
+
     on_turn_off:
-      - script.execute: update_relay_led
+      - script.execute: update_leds
+
       - mqtt.publish:
           topic: plug001/set
           payload: "off"
 
-  # 继电器指示灯总开关（允许/禁止 LED 亮的开关）
+
+
+  # =====================
+  # 继电器指示灯允许开关
+  #
+  # ON  = 跟随继电器
+  # OFF = 强制关闭
+  # =====================
+
   - platform: template
-    id: relay_led_enable
+    id: relay_led_switch
     name: "继电器指示灯"
+
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
 
+
     turn_on_action:
-      - script.execute: update_relay_led
+
+      - lambda: |-
+          id(relay_led_enable) = true;
+
+      - script.execute: update_leds
+
+
 
     turn_off_action:
-      - script.execute: update_relay_led
 
-  # WiFi状态灯（在 HA 中显示为开关，但底层直接控制 output）
+      - lambda: |-
+          id(relay_led_enable) = false;
+
+      - script.execute: update_leds
+
+
+
+
+  # =====================
+  # WiFi指示灯允许开关
+  #
+  # ON  = WiFi状态灯
+  # OFF = 强制关闭
+  # =====================
+
   - platform: template
     id: wifi_led_switch
-    name: "WiFi状态灯"
+    name: "WiFi指示灯"
+
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
-    
+
+
     turn_on_action:
-      - output.turn_on: wifi_led_output
-      
+
+      - lambda: |-
+          id(wifi_led_enable) = true;
+
+
+
     turn_off_action:
+
+      - lambda: |-
+          id(wifi_led_enable) = false;
+
       - output.turn_off: wifi_led_output
 
-# ================= 核心控制区结束 =================
+
+
+
+# ==========================
+# 按键 GPIO14
+# ==========================
 
 binary_sensor:
+
   - platform: gpio
     id: button_input
     internal: true
+
     pin:
       number: GPIO14
       mode: INPUT_PULLUP
+
+
     filters:
+
       - invert:
       - delayed_on: 50ms
       - delayed_off: 50ms
+
+
     on_press:
+
       - switch.toggle: relay
 
+
+
+
+# ==========================
+# WiFi灯状态控制
+#
+# 500ms检测一次
+#
+# 未连接 WiFi -> 闪烁
+# 已连接     -> 灭
+# 关闭开关   -> 灭
+# ==========================
+
+interval:
+
+  - interval: 500ms
+
+    then:
+
+
+      - if:
+
+          condition:
+
+            lambda: |-
+              return !id(wifi_led_enable);
+
+
+          then:
+
+            - output.turn_off: wifi_led_output
+
+
+
+      - if:
+
+          condition:
+
+            and:
+
+              - lambda: |-
+                  return id(wifi_led_enable);
+
+              - not:
+                  wifi.connected
+
+
+          then:
+
+            - output.toggle: wifi_led_output
+
+
+
+      - if:
+
+          condition:
+
+            and:
+
+              - lambda: |-
+                  return id(wifi_led_enable);
+
+              - wifi.connected
+
+
+          then:
+
+            - output.turn_off: wifi_led_output
 sensor:
+
+  # WiFi信号
   - platform: wifi_signal
     id: wifi_db
-    name: WiFi信号_WiFiSignal
+    name: "WiFi信号_WiFiSignal"
     update_interval: 60s
 
+
+  # WiFi质量百分比
   - platform: template
     id: wifi_quality
-    name: WiFi质量_WiFiQuality
+    name: "WiFi质量_WiFiQuality"
+
     lambda: |-
       float x = id(wifi_db).state;
-      if (x <= -100) return 0;
-      if (x >= -50) return 100;
+
+      if (x <= -100)
+        return 0;
+
+      if (x >= -50)
+        return 100;
+
       return 2 * (x + 100);
+
     unit_of_measurement: "%"
 
+
+  # ESP8266剩余内存
   - platform: template
     id: free_heap
-    name: 剩余内存_FreeHeap
+    name: "剩余内存_FreeHeap"
+
     lambda: |-
       return ESP.getFreeHeap();
+
     unit_of_measurement: "B"
+
     update_interval: 60s
 
+
+  # 运行时间
   - platform: uptime
     id: uptime_sensor
     name: "运行时间_Uptime"
+
     update_interval: 60s
 
+
+
 text_sensor:
+
+  # IP地址
   - platform: wifi_info
+
     ip_address:
       name: "设备IP"
 
+
+
 button:
+
+  # 重启
   - platform: restart
     name: "重启设备"
