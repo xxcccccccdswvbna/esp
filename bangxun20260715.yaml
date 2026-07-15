@@ -75,21 +75,21 @@ mqtt:
 
 # ================= 核心控制区：单一脚本 + Output 架构 =================
 
-# 1. 底层输出：纯粹控制 GPIO 引脚（不暴露给 HA，最稳定）
+# 1. 底层输出：纯粹控制 GPIO 引脚
 output:
   # 继电器指示灯
   - platform: gpio
     id: relay_led_output
     pin:
       number: GPIO12
-      inverted: true
+      inverted: true  # 【关键修复】：加上这个，turn_on 时就会输出低电平点亮灯
       
   # WiFi 状态灯
   - platform: gpio
     id: wifi_led_output
     pin:
       number: GPIO13
-      inverted: true
+      inverted: true  # WiFi灯也是低电平点亮，同样加上 inverted
 
 # 2. 唯一更新 LED 状态的脚本（所有状态同步都在这里完成）
 script:
@@ -101,9 +101,13 @@ script:
             lambda: |-
               return id(relay).state && id(relay_led_enable).state;
           then:
+            # 条件满足时，同时点亮继电器灯和WiFi灯
             - output.turn_on: relay_led_output
+            - output.turn_on: wifi_led_output
           else:
+            # 条件不满足时，同时熄灭继电器灯和WiFi灯
             - output.turn_off: relay_led_output
+            - output.turn_off: wifi_led_output
 
 # 3. 开关实体定义
 switch:
