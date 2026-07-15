@@ -1,6 +1,10 @@
 esphome:
   name: ee
   friendly_name: 邦训小萌1s
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: update_relay_led
 
 esp8266:
   board: esp01_1m
@@ -73,7 +77,7 @@ mqtt:
               id(relay).turn_off();
             }
 
-# ================= 核心控制区：单一脚本 + Output 架构 =================
+# ================= 核心控制区 =================
 
 # 1. 底层输出：纯粹控制 GPIO 引脚
 output:
@@ -82,16 +86,16 @@ output:
     id: relay_led_output
     pin:
       number: GPIO12
-      inverted: true  # 【关键修复】：加上这个，turn_on 时就会输出低电平点亮灯
+      inverted: true
       
   # WiFi 状态灯
   - platform: gpio
     id: wifi_led_output
     pin:
       number: GPIO13
-      inverted: true  # WiFi灯也是低电平点亮，同样加上 inverted
+      inverted: true 
 
-# 2. 唯一更新 LED 状态的脚本（所有状态同步都在这里完成）
+# 2. 继电器灯同步脚本 (只管 GPIO12)
 script:
   - id: update_relay_led
     mode: restart
@@ -101,15 +105,11 @@ script:
             lambda: |-
               return id(relay).state && id(relay_led_enable).state;
           then:
-            # 条件满足时，同时点亮继电器灯和WiFi灯
             - output.turn_on: relay_led_output
-            - output.turn_on: wifi_led_output
           else:
-            # 条件不满足时，同时熄灭继电器灯和WiFi灯
             - output.turn_off: relay_led_output
-            - output.turn_off: wifi_led_output
 
-# 3. 开关实体定义
+# 3. 实体开关定义
 switch:
   # 插座开关
   - platform: gpio
@@ -129,31 +129,59 @@ switch:
           topic: plug001/set
           payload: "off"
 
-  # 继电器指示灯总开关（允许/禁止 LED 亮的开关）
+  # 继电器指示灯总开关（仅做状态存储）
   - platform: template
     id: relay_led_enable
     name: "继电器指示灯"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
-
     turn_on_action:
       - script.execute: update_relay_led
-
     turn_off_action:
       - script.execute: update_relay_led
 
-  # WiFi状态灯（在 HA 中显示为开关，但底层直接控制 output）
+  # WiFi状态灯允许开关（仅做状态存储，实际控制由 interval 接管）
   - platform: template
     id: wifi_led_switch
-    name: "WiFi状态灯"
+    name: "WiFi指示灯"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
-    
-    turn_on_action:
-      - output.turn_on: wifi_led_output
-      
-    turn_off_action:
-      - output.turn_off: wifi_led_output
+
+# 4. WiFi 状态独立检测逻辑 (只管 GPIO13)
+interval:
+  - interval: 500ms
+    then:
+      # 如果 WiFi 指示灯功能被前端手动关闭，则强制熄灭
+      - if:
+          condition:
+            lambda: return !id(wifi_led_switch).state;
+          then:
+            - output.turn_off: wifi_led_output
+
+      # 如果功能开启，但未连接 WiFi -> 手动闪烁
+      - if:
+          condition:
+            and:
+              - lambda: return id(wifi_led_switch).state;
+              - not: wifi.connected
+          then:
+            - lambda: |-
+                static bool toggle_state = false;
+                toggle_state = !toggle_state;
+                if (toggle_state) {
+                  id(wifi_led_output).turn_on();
+                } else {
+                  id(wifi_led_output).turn_off();
+                }
+
+      # 如果功能开启，且已连接 WiFi -> 熄灭
+      - if:
+          condition:
+            and:
+              - lambda: return id(wifi_led_switch).state;
+              - wifi.connected
+          then:
+            - output.turn_off: wifi_led_output
 
 # ================= 核心控制区结束 =================
 
