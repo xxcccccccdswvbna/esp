@@ -75,36 +75,46 @@ mqtt:
 
 # ================= 核心控制区 =================
 
-# 1. 底层输出：用 lambda 实时计算指示灯状态
+# 1. 全局变量：用来记录“指示灯总开关”的状态
+globals:
+  - id: relay_led_enable_state
+    type: bool
+    restore_value: yes
+    initial_value: 'true'  # 默认开启
+
+# 2. 底层输出：纯粹控制 GPIO12 引脚（不暴露给 HA，最稳定）
 output:
   - platform: gpio
     id: relay_led_output
     pin:
       number: GPIO12
       inverted: true  # 如果你的灯是高电平点亮，请删掉这一行
-    # 核心逻辑：只要“插座开关”是开的，并且“指示灯总开关”也是开的，灯就亮。
-    # 这个逻辑是实时生效的，无论继电器是通过按钮、HA还是MQTT打开的！
-    lambda: |-
-      if (id(relay).state && id(relay_led_enable).state) {
-        return 1.0; // 亮灯
-      } else {
-        return 0.0; // 灭灯
-      }
 
-# 2. 开关实体定义
+# 3. 开关实体定义
 switch:
-  # 指示灯总开关
+  # 指示灯总开关（在 HA 中显示，仅用于切换全局变量）
   - platform: template
     id: relay_led_enable
     name: "继电器指示灯"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
-    # 状态改变时，强制刷新一下 output 的状态
+    
+    # 当你在 HA 中打开总开关时，更新全局变量，并检查插座状态
     on_turn_on:
-      - output.set_level:
-          id: relay_led_output
-          level: !lambda 'return id(relay).state ? 1.0 : 0.0;'
+      - globals.set:
+          id: relay_led_enable_state
+          value: 'true'
+      - if:
+          condition:
+            switch.is_on: relay
+          then:
+            - output.turn_on: relay_led_output
+            
+    # 当你在 HA 中关闭总开关时，更新全局变量，并强制关灯
     on_turn_off:
+      - globals.set:
+          id: relay_led_enable_state
+          value: 'false'
       - output.turn_off: relay_led_output
 
   # 插座开关
@@ -112,14 +122,19 @@ switch:
     id: relay
     name: "插座开关"
     pin: GPIO15
-    # 状态改变时，强制刷新一下 output 的状态
+    
+    # 插座打开时：检查全局变量，如果允许亮灯，则点亮底层 output
     on_turn_on:
-      - output.set_level:
-          id: relay_led_output
-          level: !lambda 'return id(relay_led_enable).state ? 1.0 : 0.0;'
+      - if:
+          condition:
+            lambda: 'return id(relay_led_enable_state);'
+          then:
+            - output.turn_on: relay_led_output
       - mqtt.publish:
           topic: plug001/set
           payload: "on"
+          
+    # 插座关闭时：无条件熄灭底层 output
     on_turn_off:
       - output.turn_off: relay_led_output
       - mqtt.publish:
