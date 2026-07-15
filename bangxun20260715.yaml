@@ -73,17 +73,25 @@ mqtt:
               id(relay).turn_off();
             }
 
-# ================= 核心修改区 =================
+# ================= 核心控制区 =================
 
-# 1. 将指示灯引脚定义为 output (底层控制，最稳定)
+# 1. 底层输出：用 lambda 实时计算指示灯状态
 output:
   - platform: gpio
     id: relay_led_output
     pin:
       number: GPIO12
-      inverted: true  # 如果你的灯是低电平点亮，保留 inverted: true
+      inverted: true  # 如果你的灯是高电平点亮，请删掉这一行
+    # 核心逻辑：只要“插座开关”是开的，并且“指示灯总开关”也是开的，灯就亮。
+    # 这个逻辑是实时生效的，无论继电器是通过按钮、HA还是MQTT打开的！
+    lambda: |-
+      if (id(relay).state && id(relay_led_enable).state) {
+        return 1.0; // 亮灯
+      } else {
+        return 0.0; // 灭灯
+      }
 
-# 2. 定义开关
+# 2. 开关实体定义
 switch:
   # 指示灯总开关
   - platform: template
@@ -91,16 +99,11 @@ switch:
     name: "继电器指示灯"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
-    
-    # 当总开关被打开时，检查插座状态，若插座开着则点亮指示灯
+    # 状态改变时，强制刷新一下 output 的状态
     on_turn_on:
-      - if:
-          condition:
-            switch.is_on: relay
-          then:
-            - output.turn_on: relay_led_output
-            
-    # 当总开关被关闭时，直接熄灭指示灯
+      - output.set_level:
+          id: relay_led_output
+          level: !lambda 'return id(relay).state ? 1.0 : 0.0;'
     on_turn_off:
       - output.turn_off: relay_led_output
 
@@ -109,26 +112,21 @@ switch:
     id: relay
     name: "插座开关"
     pin: GPIO15
-
+    # 状态改变时，强制刷新一下 output 的状态
     on_turn_on:
-      # 插座打开时，判断指示灯总开关是否开启，开启则点亮
-      - if:
-          condition:
-            switch.is_on: relay_led_enable
-          then:
-            - output.turn_on: relay_led_output
+      - output.set_level:
+          id: relay_led_output
+          level: !lambda 'return id(relay_led_enable).state ? 1.0 : 0.0;'
       - mqtt.publish:
           topic: plug001/set
           payload: "on"
-
     on_turn_off:
-      # 插座关闭时，无条件熄灭指示灯
       - output.turn_off: relay_led_output
       - mqtt.publish:
           topic: plug001/set
           payload: "off"
 
-  # WiFi状态灯 (保留原有逻辑)
+  # WiFi状态灯 (保持不变)
   - platform: gpio
     id: wifi_led
     name: "WiFi状态灯"
@@ -137,7 +135,7 @@ switch:
       inverted: true
     restore_mode: RESTORE_DEFAULT_ON
 
-# ================= 核心修改区结束 =================
+# ================= 核心控制区结束 =================
 
 binary_sensor:
   - platform: gpio
