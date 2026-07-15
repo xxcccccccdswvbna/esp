@@ -151,14 +151,14 @@ switch:
 interval:
   - interval: 500ms
     then:
-      # 如果 WiFi 指示灯功能被前端手动关闭，则强制熄灭
+      # 1. 如果 WiFi 指示灯功能被前端手动关闭，则强制熄灭
       - if:
           condition:
             lambda: return !id(wifi_led_switch).state;
           then:
             - output.turn_off: wifi_led_output
 
-      # 如果功能开启，但未连接 WiFi -> 手动闪烁
+      # 2. 如果功能开启，但未连接 WiFi -> 手动闪烁
       - if:
           condition:
             and:
@@ -174,14 +174,14 @@ interval:
                   id(wifi_led_output).turn_off();
                 }
 
-      # 如果功能开启，且已连接 WiFi -> 熄灭
+      # 3. 如果功能开启，且已连接 WiFi -> 常亮显示连接正常
       - if:
           condition:
             and:
               - lambda: return id(wifi_led_switch).state;
               - wifi.connected
           then:
-            - output.turn_off: wifi_led_output
+            - output.turn_on: wifi_led_output
 
 # ================= 核心控制区结束 =================
 
