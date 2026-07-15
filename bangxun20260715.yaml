@@ -93,13 +93,28 @@ binary_sensor:
 
 
 switch:
+  # 新增的开关：用于控制继电器指示灯的总开关
+  - platform: template
+    id: relay_led_enable
+    name: "继电器指示灯"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+  # 修改后的开关：插座开关
   - platform: gpio
     id: relay
     name: "插座开关"
     pin: GPIO15
 
     on_turn_on:
-      - switch.turn_on: relay_led
+      # 增加判断逻辑：只有当“继电器指示灯”开关开启时，才点亮指示灯
+      - if:
+          condition:
+            switch.is_on: relay_led_enable
+          then:
+            - switch.turn_on: relay_led
+          else:
+            - switch.turn_off: relay_led
       - mqtt.publish:
           topic: plug001/set
           payload: "on"
@@ -110,7 +125,7 @@ switch:
           topic: plug001/set
           payload: "off"
 
-
+  # 继电器指示灯实体
   - platform: gpio
     id: relay_led
     internal: true
@@ -118,7 +133,7 @@ switch:
       number: GPIO12
       inverted: true
 
-
+  # WiFi状态灯
   - platform: gpio
     id: wifi_led
     name: "WiFi状态灯"
@@ -126,6 +141,7 @@ switch:
       number: GPIO13
       inverted: true
     restore_mode: RESTORE_DEFAULT_ON
+
 sensor:
   - platform: wifi_signal
     id: wifi_db
@@ -159,7 +175,6 @@ text_sensor:
   - platform: wifi_info
     ip_address:
       name: "设备IP"
-
 
 button:
   - platform: restart
