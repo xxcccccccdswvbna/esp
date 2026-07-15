@@ -55,7 +55,6 @@ mqtt:
             - mqtt.publish:
                 topic: plug001/up
                 payload: "on"
-
       - if:
           condition:
             switch.is_off: relay
@@ -74,79 +73,62 @@ mqtt:
               id(relay).turn_off();
             }
 
-binary_sensor:
+# ================= 核心修改区 =================
+
+# 1. 将指示灯引脚定义为 output (底层控制，最稳定)
+output:
   - platform: gpio
-    id: button_input
-    internal: true
+    id: relay_led_output
     pin:
-      number: GPIO14
-      mode: INPUT_PULLUP
+      number: GPIO12
+      inverted: true  # 如果你的灯是低电平点亮，保留 inverted: true
 
-    filters:
-      - invert:
-      - delayed_on: 50ms
-      - delayed_off: 50ms
-
-    on_press:
-      - switch.toggle: relay
-
+# 2. 定义开关
 switch:
-  # 1. 新增的开关：用于控制继电器指示灯的总开关
+  # 指示灯总开关
   - platform: template
     id: relay_led_enable
     name: "继电器指示灯"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
     
-    # 当此开关被打开时，检查插座状态，若插座开着则点亮指示灯
+    # 当总开关被打开时，检查插座状态，若插座开着则点亮指示灯
     on_turn_on:
       - if:
           condition:
             switch.is_on: relay
           then:
-            - switch.turn_on: relay_led
+            - output.turn_on: relay_led_output
             
-    # 当此开关被关闭时，直接熄灭指示灯
+    # 当总开关被关闭时，直接熄灭指示灯
     on_turn_off:
-      - switch.turn_off: relay_led
+      - output.turn_off: relay_led_output
 
-  # 2. 插座开关
+  # 插座开关
   - platform: gpio
     id: relay
     name: "插座开关"
     pin: GPIO15
 
     on_turn_on:
-      # 插座打开时，直接尝试点亮指示灯
-      # 如果此时 relay_led_enable 是关闭的，灯不会亮（由 relay_led_enable 的逻辑保证）
-      # 等等，这里如果直接 turn_on，会绕过 relay_led_enable 的检查！
-      # 所以这里依然需要判断，或者让 relay_led_enable 来接管。
-      # 最严谨的做法：插座打开时，判断指示灯总开关是否开启
+      # 插座打开时，判断指示灯总开关是否开启，开启则点亮
       - if:
           condition:
             switch.is_on: relay_led_enable
           then:
-            - switch.turn_on: relay_led
+            - output.turn_on: relay_led_output
       - mqtt.publish:
           topic: plug001/set
           payload: "on"
 
     on_turn_off:
       # 插座关闭时，无条件熄灭指示灯
-      - switch.turn_off: relay_led
+      - output.turn_off: relay_led_output
       - mqtt.publish:
           topic: plug001/set
           payload: "off"
 
-  # 3. 继电器指示灯实体
-  - platform: gpio
-    id: relay_led
-    internal: true
-    pin:
-      number: GPIO12
-      inverted: true
-
-  # 4. WiFi状态灯
+  # WiFi状态灯 (保留原有逻辑)
   - platform: gpio
     id: wifi_led
     name: "WiFi状态灯"
@@ -154,6 +136,22 @@ switch:
       number: GPIO13
       inverted: true
     restore_mode: RESTORE_DEFAULT_ON
+
+# ================= 核心修改区结束 =================
+
+binary_sensor:
+  - platform: gpio
+    id: button_input
+    internal: true
+    pin:
+      number: GPIO14
+      mode: INPUT_PULLUP
+    filters:
+      - invert:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      - switch.toggle: relay
 
 sensor:
   - platform: wifi_signal
