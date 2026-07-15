@@ -73,75 +73,64 @@ mqtt:
               id(relay).turn_off();
             }
 
-# ================= 核心控制区 =================
+# ================= 核心控制区：单一脚本收口架构 =================
 
-# 1. 全局变量：用来记录“指示灯总开关”的状态
-globals:
-  - id: relay_led_enable_state
-    type: bool
-    restore_value: yes
-    initial_value: 'true'  # 默认开启
-
-# 2. 底层输出：纯粹控制 GPIO12 引脚（不暴露给 HA，最稳定）
-output:
-  - platform: gpio
-    id: relay_led_output
-    pin:
-      number: GPIO12
-      inverted: true  # 如果你的灯是高电平点亮，请删掉这一行
-
-# 3. 开关实体定义
-switch:
-  # 指示灯总开关（在 HA 中显示，仅用于切换全局变量）
-  - platform: template
-    id: relay_led_enable
-    name: "继电器指示灯"
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
-    
-    # 当你在 HA 中打开总开关时，更新全局变量，并检查插座状态
-    on_turn_on:
-      - globals.set:
-          id: relay_led_enable_state
-          value: 'true'
+# 1. 唯一更新 LED 状态的脚本（所有状态同步都在这里完成）
+script:
+  - id: update_relay_led
+    mode: restart
+    then:
       - if:
           condition:
-            switch.is_on: relay
+            lambda: |-
+              return id(relay).state && id(relay_led_enable).state;
           then:
-            - output.turn_on: relay_led_output
-            
-    # 当你在 HA 中关闭总开关时，更新全局变量，并强制关灯
-    on_turn_off:
-      - globals.set:
-          id: relay_led_enable_state
-          value: 'false'
-      - output.turn_off: relay_led_output
+            - switch.turn_on: relay_led
+          else:
+            - switch.turn_off: relay_led
 
+# 2. 开关实体定义
+switch:
   # 插座开关
   - platform: gpio
     id: relay
     name: "插座开关"
     pin: GPIO15
-    
-    # 插座打开时：检查全局变量，如果允许亮灯，则点亮底层 output
+
     on_turn_on:
-      - if:
-          condition:
-            lambda: 'return id(relay_led_enable_state);'
-          then:
-            - output.turn_on: relay_led_output
+      - script.execute: update_relay_led
       - mqtt.publish:
           topic: plug001/set
           payload: "on"
-          
-    # 插座关闭时：无条件熄灭底层 output
+
     on_turn_off:
-      - output.turn_off: relay_led_output
+      - script.execute: update_relay_led
       - mqtt.publish:
           topic: plug001/set
           payload: "off"
 
-  # WiFi状态灯 (保持不变)
+  # 继电器指示灯（允许/禁止 LED 亮的总开关）
+  - platform: template
+    id: relay_led_enable
+    name: "继电器指示灯"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+    turn_on_action:
+      - script.execute: update_relay_led
+
+    turn_off_action:
+      - script.execute: update_relay_led
+
+  # 继电器指示灯实体（底层 GPIO，不暴露给 HA）
+  - platform: gpio
+    id: relay_led
+    internal: true
+    pin:
+      number: GPIO12
+      inverted: true
+
+  # WiFi状态灯
   - platform: gpio
     id: wifi_led
     name: "WiFi状态灯"
