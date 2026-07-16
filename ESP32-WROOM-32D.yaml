@@ -1,52 +1,97 @@
+substitutions:
+  test_gpio: "2"
+
 esphome:
-  name: ct1
-  friendly_name: CT1 Lite
-  
-  # 🚨 核心补丁：通过 PlatformIO 编译选项强制指定 MAC 地址
-  # 这会直接修改底层固件的默认 MAC，完美绕过损坏的 eFuse
-  platformio_options:
-    build_flags: 
-      - "-D CONFIG_ESP32_MAC_ADDR=\"AA:BB:CC:DD:EE:FF\""
+  name: yeelight-led-test
+  friendly_name: Yeelight LED Test
 
 esp32:
   board: esp32dev
+  flash_size: 4MB
   framework:
     type: esp-idf
     sdkconfig_options:
-      CONFIG_FREERTOS_UNICORE: y          
+      CONFIG_FREERTOS_UNICORE: y
 
 logger:
-  level: WARN                             
-  baud_rate: 115200
+  level: VERY_VERBOSE
+
+api:
+
+ota:
+  - platform: esphome
 
 wifi:
   ssid: "CC"
   password: "chen1122"
-  power_save_mode: LIGHT                  
 
-# 🚨 开启网页服务 (满足你的网页升级需求)
 web_server:
-  port: 80
 
-api:
-  reboot_timeout: 0s
+captive_portal:
 
-ota:
-  - platform: esphome                     
-
-# === 蓝牙代理 ===
-esp32_ble_tracker:
-  scan_parameters:
-    interval: 320ms
-    window: 30ms
-    active: false                         
-
-bluetooth_proxy:                          
-
-# === 基础监控 ===
 sensor:
   - platform: uptime
-    name: "Uptime"
-  - platform: wifi_signal
-    name: "WiFi Signal"
-    update_interval: 60s
+    name: Uptime
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: IP
+
+# 已确认的四个按键
+binary_sensor:
+  - platform: gpio
+    pin: GPIO34
+    name: KEY1
+    on_press:
+      - logger.log: "KEY1"
+
+  - platform: gpio
+    pin: GPIO35
+    name: KEY2
+    on_press:
+      - logger.log: "KEY2"
+
+  - platform: gpio
+    pin: GPIO32
+    name: KEY3
+    on_press:
+      - logger.log: "KEY3"
+
+  - platform: gpio
+    pin: GPIO33
+    name: KEY4
+    on_press:
+      - logger.log: "KEY4"
+
+output:
+  - platform: gpio
+    id: test_output
+    pin:
+      number: GPIO${test_gpio}
+
+switch:
+  - platform: output
+    name: GPIO ${test_gpio}
+    output: test_output
+
+button:
+  - platform: template
+    name: 测试GPIO
+    on_press:
+      - logger.log: "========== START TEST =========="
+      - output.turn_on: test_output
+      - delay: 1s
+      - output.turn_off: test_output
+      - delay: 300ms
+      - output.turn_on: test_output
+      - delay: 300ms
+      - output.turn_off: test_output
+      - delay: 300ms
+      - output.turn_on: test_output
+      - delay: 300ms
+      - output.turn_off: test_output
+      - logger.log: "========== END TEST =========="
+
+  - platform: restart
+    name: Restart
