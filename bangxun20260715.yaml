@@ -2,58 +2,46 @@ esphome:
   name: ee
   friendly_name: 邦训小萌1s
 
-# ⭐⭐⭐⭐⭐ 新增：合并 Flash 写入，保护寿命
-preferences:
-  flash_write_interval: 10min
-
-on_boot:
-  priority: -100
-  then:
-    - script.execute: update_relay_led
-
 esp8266:
   board: esp01_1m
-  # ⭐⭐⭐⭐ 修改：关闭全局 Flash 恢复（除非你非常需要断电记忆）
-  # 如果必须保留继电器状态，请改回 true
-  restore_from_flash: false
+  restore_from_flash: false # 不保存断电状态，彻底告别 Flash 写入焦虑
 
 logger:
-  baud_rate: 0
+  baud_rate: 0 # 关闭串口日志，节省资源
 
-api:
+# 1. 基础网络与 OTA
+wifi:
+  ssid: "CC"
+  password: "chen1122"
+  reboot_timeout: 0s
+  ap: # 备用热点
+    ssid: "EE-Setup"
+    password: "12345678"
 
 ota:
   - platform: esphome
     password: "chen1122"
 
-wifi:
-  ssid: "CC"
-  password: "chen1122"
-  min_auth_mode: WPA2
-  reboot_timeout: 0s
-  ap:
-    ssid: "EE-Setup"
-    password: "12345678"
+# 2. 保留原生 API (供 ESPHome App 或 Home Assistant 直连)
+api:
 
-captive_portal:
-
+# 3. 保留 Web Server (供浏览器网页控制)
 web_server:
   port: 80
 
+# 4. 保留 MQTT (供巴法云等第三方平台控制)
 mqtt:
   broker: bemfa.com
   port: 9501
   username: "97109945d7e24559b3e4ca7a1f8ef160"
   password: "97109945d7e24559b3e4ca7a1f8ef160"
   client_id: "97109945d7e24559b3e4ca7a1f8ef160"
-  # ⭐⭐ 修改：减少心跳包频率
-  keepalive: 60s
+  keepalive: 60s # 优化：降低心跳频率
   discovery: false
 
   birth_message:
     topic: plug001/up
     payload: "online"
-
   will_message:
     topic: plug001/up
     payload: "offline"
@@ -61,15 +49,13 @@ mqtt:
   on_connect:
     then:
       - if:
-          condition:
-            switch.is_on: relay
+          condition: switch.is_on: relay
           then:
             - mqtt.publish:
                 topic: plug001/up
                 payload: "on"
       - if:
-          condition:
-            switch.is_off: relay
+          condition: switch.is_off: relay
           then:
             - mqtt.publish:
                 topic: plug001/up
@@ -88,89 +74,49 @@ mqtt:
 # ================= 核心控制区 =================
 
 output:
-  # 继电器指示灯
+  # 继电器指示灯输出
   - platform: gpio
     id: relay_led_output
     pin:
       number: GPIO12
       inverted: true
 
-  # WiFi 状态灯
+  # WiFi 状态灯输出
   - platform: gpio
     id: wifi_led_output
     pin:
       number: GPIO13
       inverted: true
 
-script:
-  - id: update_relay_led
-    mode: restart
-    then:
-      - if:
-          condition:
-            lambda: |-
-              return id(relay).state && id(relay_led_enable).state;
-          then:
-            - output.turn_on: relay_led_output
-          else:
-            - output.turn_off: relay_led_output
-
 switch:
-  # 插座开关
+  # 继电器开关
   - platform: gpio
     id: relay
     name: "插座开关"
     pin: GPIO15
-
+    
+    # 极简同步逻辑：继电器状态改变时，直接控制指示灯并同步 MQTT
     on_turn_on:
-      - script.execute: update_relay_led
+      - output.turn_on: relay_led_output
       - mqtt.publish:
           topic: plug001/set
           payload: "on"
-
     on_turn_off:
-      - script.execute: update_relay_led
+      - output.turn_off: relay_led_output
       - mqtt.publish:
           topic: plug001/set
           payload: "off"
 
-  # 继电器指示灯总开关
-  - platform: template
-    id: relay_led_enable
-    name: "继电器指示灯"
-    optimistic: true
-    # ⭐⭐ 修改：不再写入 Flash 保存状态
-    restore_mode: ALWAYS_ON
-    turn_on_action:
-      - script.execute: update_relay_led
-    turn_off_action:
-      - script.execute: update_relay_led
-
-  # WiFi状态灯允许开关
-  - platform: template
-    id: wifi_led_switch
-    name: "WiFi指示灯"
-    optimistic: true
-    # ⭐⭐ 修改：不再写入 Flash 保存状态
-    restore_mode: ALWAYS_ON
-
-# ⭐⭐⭐ 修改：降低检测频率，从 500ms 改为 1000ms
+# WiFi 状态灯检测逻辑
 interval:
-  - interval: 1000ms
+  - interval: 1000ms # 1秒检测一次，降低 CPU 负载
     then:
       - if:
-          condition:
-            lambda: return !id(wifi_led_switch).state;
+          condition: wifi.connected
           then:
-            - output.turn_off: wifi_led_output
-
-      - if:
-          condition:
-            and:
-              - lambda: return id(wifi_led_switch).state;
-              - not: wifi.connected
-          then:
-            - lambda: |-
+            - output.turn_off: wifi_led_output # 连上 WiFi -> 关灯
+          else:
+            - lambda: |- # 没连上 WiFi -> 闪烁
                 static bool toggle_state = false;
                 toggle_state = !toggle_state;
                 if (toggle_state) {
@@ -179,16 +125,9 @@ interval:
                   id(wifi_led_output).turn_off();
                 }
 
-      - if:
-          condition:
-            and:
-              - lambda: return id(wifi_led_switch).state;
-              - wifi.connected
-          then:
-            - output.turn_on: wifi_led_output
-
 # ================= 核心控制区结束 =================
 
+# 保留物理按键控制
 binary_sensor:
   - platform: gpio
     id: button_input
@@ -202,46 +141,3 @@ binary_sensor:
       - delayed_off: 50ms
     on_press:
       - switch.toggle: relay
-
-sensor:
-  - platform: wifi_signal
-    id: wifi_db
-    name: WiFi信号_WiFiSignal
-    # ⭐⭐⭐ 修改：降低更新频率
-    update_interval: 300s
-
-  - platform: template
-    id: wifi_quality
-    name: WiFi质量_WiFiQuality
-    lambda: |-
-      float x = id(wifi_db).state;
-      if (x <= -100) return 0;
-      if (x >= -50) return 100;
-      return 2 * (x + 100);
-    unit_of_measurement: "%"
-    # ⭐⭐⭐ 修改：降低更新频率
-    update_interval: 300s
-
-  - platform: template
-    id: free_heap
-    name: 剩余内存_FreeHeap
-    lambda: |-
-      return ESP.getFreeHeap();
-    unit_of_measurement: "B"
-    # ⭐⭐⭐ 修改：降低更新频率
-    update_interval: 300s
-
-  - platform: uptime
-    id: uptime_sensor
-    name: "运行时间_Uptime"
-    # ⭐⭐⭐ 修改：降低更新频率
-    update_interval: 300s
-
-text_sensor:
-  - platform: wifi_info
-    ip_address:
-      name: "设备IP"
-
-button:
-  - platform: restart
-    name: "重启设备"
