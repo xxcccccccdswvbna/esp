@@ -24,7 +24,7 @@ preferences:
 logger:
   level: NONE # 完全关闭日志引擎，释放大量基础内存
 
-# api: # 已注释，不需要 HA 局域网接入就不要开，极其耗内存
+api: # 已注释，不需要 HA 局域网接入就不要开，极其耗内存
 
 ota:
   - platform: esphome
