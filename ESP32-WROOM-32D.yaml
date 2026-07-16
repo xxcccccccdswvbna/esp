@@ -1,49 +1,92 @@
 esphome:
   name: ct1
   friendly_name: CT1 Lite
+  # 🚨 核心补丁：在此处包含外部 C++ 头文件，它会在系统最最最早期运行 MAC 注入
+  includes:
+    - early_mac.h
 
 esp32:
   board: esp32dev
   framework:
     type: esp-idf
     sdkconfig_options:
-      CONFIG_FREERTOS_UNICORE: y          
+      CONFIG_FREERTOS_UNICORE: y
+      CONFIG_BT_NIMBLE_ENABLED: y
+      CONFIG_BT_CLASSIC_ENABLED: n
+      # 极限压缩蓝牙内存，防止单核内存溢出
+      CONFIG_BT_NIMBLE_MAX_CONNECTIONS: 2
+      CONFIG_BT_NIMBLE_ROLE_PERIPHERAL: n
+      CONFIG_BT_NIMBLE_ROLE_BROADCASTER: n
 
 logger:
-  level: WARN                             
+  level: WARN            # 降低日志级别，节省内存
   baud_rate: 115200
 
 wifi:
   ssid: "CC"
   password: "chen1122"
-  # 🚨 核心补丁：ESPHome 原生支持直接指定 MAC 地址！
-  # 这会自动绕过损坏的 eFuse，解决 ESP_ERR_INVALID_CRC 导致的无限重启
-  mac_address: "AA:BB:CC:DD:EE:FF"  
-  power_save_mode: LIGHT                  
+  # ESPHome 的验证器更倾向于小写的枚举值，改为小写避免编译警告
+  power_save_mode: light
 
-# 🚨 开启网页服务 (满足你的网页升级需求)
-web_server:
-  port: 80
+# 坚决关闭 HTTP 网页服务 (web_server)，单核芯片带不动它和蓝牙代理
+# web_server:
+# captive_portal:
 
 api:
   reboot_timeout: 0s
 
 ota:
-  - platform: esphome                     
+  - platform: esphome    # 保留 OTA，用于网络/HTTP 升级固件
 
-# === 蓝牙代理 ===
+external_components:
+  - source:
+      type: local
+      # 请确保 components 文件夹路径不要包含空格，且在当前目录下
+      path: components
+
+ble_gateway:
+  id: ct1_ble
+
 esp32_ble_tracker:
   scan_parameters:
     interval: 320ms
     window: 30ms
-    active: false                         
+    active: false        # 必须被动扫描，active 会直接导致单核崩溃
 
-bluetooth_proxy:                          
+bluetooth_proxy:         # 开启蓝牙代理
 
-# === 基础监控 ===
+# === 你的按键控制（主动蓝牙连接） ===
+light:
+  - platform: ble_light
+    id: device_ct_light_ctrl
+    name: "Ct Light"
+    ble_device_id: "light.ct"
+    gateway: ct1_ble
+  - platform: ble_light
+    id: device_cw_light_ctrl
+    name: "Cw Light"
+    ble_device_id: "light.cw"
+    gateway: ct1_ble
+
+fan:
+  - platform: ble_fan
+    id: device_ct_fan_ctrl
+    name: "Ct Fan"
+    ble_device_id: "fan.ct"
+    gateway: ct1_ble
+  - platform: ble_fan
+    id: device_cw_fan_ctrl
+    name: "Cw Fan"
+    ble_device_id: "fan.cw"
+    gateway: ct1_ble
+
 sensor:
   - platform: uptime
-    name: "Uptime"
+    name: "Gateway Uptime"
   - platform: wifi_signal
-    name: "WiFi Signal"
+    name: "WiFi Signal dBm"
     update_interval: 60s
+
+button:
+  - platform: restart
+    name: "Restart Gateway"
