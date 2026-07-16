@@ -1,30 +1,51 @@
 esphome:
-  name: relay-test
+  name: ct1
+  friendly_name: CT1 Lite
+  # 强制指定一个虚拟 MAC 地址，绕过芯片损坏的 eFuse 读取
+  platformio_options:
+    board_build.mcu: esp32
+  # 注意：ESPHome 较新版本支持直接在 wifi 下指定 mac_address
+  wifi:
+    mac_address: "AA:BB:CC:DD:EE:FF" 
 
-# 修改这里：将 board 改为 esp32dev
 esp32:
   board: esp32dev
   framework:
-    type: arduino  # WROOM-32D 通常使用 Arduino 框架，更稳定兼容
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_FREERTOS_UNICORE: y
+      CONFIG_BT_NIMBLE_ENABLED: n      # 彻底禁用蓝牙栈！释放大量内存
+      CONFIG_BT_CLASSIC_ENABLED: n
 
 logger:
+  level: INFO
+  baud_rate: 115200
 
 wifi:
   ssid: "CC"
   password: "chen1122"
+  power_save_mode: none
+
+# ⚠️ 关键：彻底禁用这些耗内存的组件
+# web_server:
+# captive_portal:
 
 api:
-  encryption:
-    key: "4jGVSQw9/v+e8QCB/CSQIwGFcWS3Opo4oHSRbkq41RI="
+  reboot_timeout: 0s
 
-web_server:
-  port: 80
-  version: 3
+ota:
+  - platform: esphome
 
-switch:
-  - platform: gpio
-    name: "Relay"
-    pin:
-      number: GPIO4
-      # 注意：ESP32-WROOM-32D 的 GPIO4 是可用引脚，但请确保你的硬件继电器确实接在 GPIO4 上。
-      # 如果继电器模块是低电平触发，可能需要添加 inverted: true
+# ⚠️ 关键：暂时删除所有 ble_gateway, esp32_ble_tracker, ble_light, ble_fan
+# 以及所有的 template sensor。只保留最基础的测试项。
+
+sensor:
+  - platform: uptime
+    name: "Gateway Uptime"
+  - platform: wifi_signal
+    name: "WiFi Signal dBm"
+    update_interval: 60s
+
+button:
+  - platform: restart
+    name: "Restart Gateway"
