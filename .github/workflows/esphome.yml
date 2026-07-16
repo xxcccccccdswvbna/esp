@@ -55,6 +55,14 @@ jobs:
           mkdir -p output
           find .esphome/build -name "*.bin" -exec cp {} output/ \;
 
+      # 🚨 【新增救命步骤】：无论后续是否报错，先把固件打包存档，供你手动下载！
+      - name: 上传固件到 Artifacts (重要)
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.yaml }} # 以 yaml 文件名命名，方便区分
+          path: output/*.bin
+          retention-days: 7 # 保留 7 天
+
       - name: 生成版本号
         id: tag
         run: |
@@ -63,6 +71,8 @@ jobs:
 
       - name: 发布 Release
         uses: softprops/action-gh-release@v2
+        # 即使这一步因为 GitHub 服务器抽风而失败，也不会影响你从 Artifacts 下载固件
+        continue-on-error: true 
         with:
           tag_name: build-${{ steps.tag.outputs.tag }}
           name: ESPHome-${{ steps.tag.outputs.tag }}
@@ -71,10 +81,8 @@ jobs:
 
             YAML:
             ${{ matrix.yaml }}
-
           files: output/*.bin
           overwrite_files: true
           generate_release_notes: false
-
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
