@@ -128,21 +128,40 @@ switch:
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
 
-# ================= 核心优化 3：精简循环开销 =================
+# ================= 绿色、静音、安全的控制区 =================
+
 interval:
   - interval: 500ms
     then:
       - lambda: |-
-          // 使用原生 C++ 逻辑替代 YAML 动作树，大幅减少每次执行的 CPU 查表和内存分配开销
+          // 引入静态变量，用来记录上一次的 LED 实际物理状态
+          // 0 = 熄灭, 1 = 常亮, 2 = 闪烁
+          static int last_physical_state = -1; 
+          static bool toggle = false;
+
+          // 1. 如果指示灯功能被关闭
           if (!id(wifi_led_switch).state) {
-            id(wifi_led_output).turn_off();
-          } else if (network::is_connected()) {
-            id(wifi_led_output).turn_on();
-          } else {
-            static bool toggle = false;
+            if (last_physical_state != 0) {
+              id(wifi_led_output).turn_off();
+              last_physical_state = 0; // 只在切换瞬间写入一次引脚
+            }
+          } 
+          // 2. 如果已连接 WiFi -> 常亮
+          else if (network::is_connected()) {
+            if (last_physical_state != 1) {
+              id(wifi_led_output).turn_on();
+              last_physical_state = 1; // 只在连接成功瞬间写入一次引脚
+            }
+          } 
+          // 3. 未连接 WiFi -> 闪烁 (闪烁本身需要交替状态，允许交替，但局限于未连接时)
+          else {
+            last_physical_state = 2; // 标记当前在闪烁状态
             toggle = !toggle;
-            if (toggle) id(wifi_led_output).turn_on();
-            else id(wifi_led_output).turn_off();
+            if (toggle) {
+              id(wifi_led_output).turn_on();
+            } else {
+              id(wifi_led_output).turn_off();
+            }
           }
 
 # ================= 核心控制区结束 =================
