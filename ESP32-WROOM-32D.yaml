@@ -49,9 +49,6 @@ esp32_ble_tracker:
     interval: 320ms
     window: 30ms
 
-bluetooth_proxy:
-  active: true
-
 button:
   - platform: restart
     name: Restart
