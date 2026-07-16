@@ -1,0 +1,133 @@
+esphome:
+  name: ee
+  friendly_name: ee
+
+esp8266:
+  board: esp01_1m
+  restore_from_flash: true
+
+logger:
+  baud_rate: 0
+
+# 如果不需要 Home Assistant 本地集成，强烈建议注释掉 api 以节省内存
+api:
+
+ota:
+  - platform: esphome
+    password: "chen1122"
+
+wifi:
+  ssid: "CC"
+  password: "chen1122"
+  min_auth_mode: WPA2
+  reboot_timeout: 0s
+  ap:
+    ssid: "EE-Setup"
+    password: "12345678"
+
+captive_portal:
+
+web_server:
+  port: 80
+
+mqtt:
+  broker: bemfa.com
+  port: 9501
+
+  # 巴法云私钥配置
+  username: "97109945d7e24559b3e4ca7a1f8ef160"
+  password: "97109945d7e24559b3e4ca7a1f8ef160"
+  client_id: "97109945d7e24559b3e4ca7a1f8ef160"
+
+  # 优化：增加心跳间隔，防止被服务器判定为超时掉线
+  keepalive: 30s 
+
+  discovery: false
+  birth_message: 
+  will_message: 
+
+  # 连接成功时同步状态
+  on_connect:
+    then:
+      - if:
+          condition:
+            switch.is_on: relay
+          then:
+            - mqtt.publish:
+                topic: plug001/up
+                payload: "on"
+      - if:
+          condition:
+            switch.is_off: relay
+          then:
+            - mqtt.publish:
+                topic: plug001/up
+                payload: "off"
+
+  # 接收控制指令
+  on_message:
+    - topic: plug001
+      then:
+        - lambda: |-
+            if (x == "on" || x == "ON" || x == "1") {
+              id(relay).turn_on();
+            } else if (x == "off" || x == "OFF" || x == "0") {
+              id(relay).turn_off();
+            }
+
+binary_sensor:
+  - platform: gpio
+    id: button_input
+    internal: true
+    pin:
+      number: GPIO14
+      mode: INPUT_PULLUP
+    filters:
+      - invert:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_press:
+      - switch.toggle: relay
+
+switch:
+  - platform: gpio
+    id: relay
+    name: "插座开关"
+    pin: GPIO15
+
+    on_turn_on:
+      - switch.turn_on: relay_led
+      - mqtt.publish:
+          topic: plug001/set
+          payload: "on"
+
+    on_turn_off:
+      - switch.turn_off: relay_led
+      - mqtt.publish:
+          topic: plug001/set
+          payload: "off"
+
+  - platform: gpio
+    id: relay_led
+    internal: true
+    pin:
+      number: GPIO12
+      inverted: true
+
+  - platform: gpio
+    id: wifi_led
+    name: "WiFi状态灯"
+    pin:
+      number: GPIO13
+      inverted: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+sensor:
+  - platform: uptime
+    id: uptime_sensor
+    name: "运行时长"
+    update_interval: 60s
+
+button:
+  - platform: restart
+    name: "重启设备"
