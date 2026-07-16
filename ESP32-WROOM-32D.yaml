@@ -2,7 +2,7 @@ esphome:
   name: ct1
   friendly_name: CT1 Lite
   
-  # 修复 eFuse MAC 损坏导致的底层崩溃
+  # 🚨 核心补丁：修复 eFuse MAC 损坏导致的底层崩溃
   on_boot:
     priority: 1000.0
     then:
@@ -16,40 +16,40 @@ esp32:
   framework:
     type: esp-idf
     sdkconfig_options:
-      CONFIG_FREERTOS_UNICORE: y
-      CONFIG_BT_NIMBLE_ENABLED: y
-      CONFIG_BT_CLASSIC_ENABLED: n
+      CONFIG_FREERTOS_UNICORE: y          # 强制单核
+      CONFIG_BT_NIMBLE_ENABLED: y         # 使用轻量级 NimBLE 蓝牙栈
+      # 移除了 CONFIG_BT_CLASSIC_ENABLED: n，防止缺失 esp_bt_defs.h 导致编译失败
 
 logger:
-  level: WARN
+  level: WARN                             # 降低日志级别，节省内存
   baud_rate: 115200
 
 wifi:
   ssid: "CC"
   password: "chen1122"
-  power_save_mode: LIGHT
+  power_save_mode: LIGHT                  # 开启省电模式
 
-# 🚨 开启网页服务 (满足你的需求，但极度消耗内存)
+# 🚨 开启网页服务 (满足你的网页升级需求)
 web_server:
   port: 80
-  # 注意：坚决不要加 captive_portal，否则必崩！
+  # 注意：坚决不要加 captive_portal，否则单核必崩！
 
 api:
   reboot_timeout: 0s
 
 ota:
-  - platform: esphome
+  - platform: esphome                     # 保留 OTA，用于网络/HTTP 升级固件
 
-# 蓝牙代理
+# === 蓝牙代理 ===
 esp32_ble_tracker:
   scan_parameters:
     interval: 320ms
     window: 30ms
-    active: false
+    active: false                         # 必须被动扫描
 
-bluetooth_proxy:
+bluetooth_proxy:                          # 开启蓝牙代理
 
-# 只保留最基础的传感器，绝对不要加之前的几十个 template 传感器！
+# === 基础监控 ===
 sensor:
   - platform: uptime
     name: "Uptime"
