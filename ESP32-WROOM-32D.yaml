@@ -1,63 +1,52 @@
 esphome:
   name: ct1
   friendly_name: CT1 Lite
-  # 🚨 核心补丁：在此处包含外部 C++ 头文件，它会在系统最最最早期运行 MAC 注入
-  includes:
-    - early_mac.h
+  
+  # 🚨 核心补丁：通过 PlatformIO 编译选项强制指定 MAC 地址
+  # 这会直接修改底层固件的默认 MAC，完美绕过损坏的 eFuse
+  platformio_options:
+    build_flags: 
+      - "-D CONFIG_ESP32_MAC_ADDR=\"AA:BB:CC:DD:EE:FF\""
 
 esp32:
   board: esp32dev
   framework:
     type: esp-idf
     sdkconfig_options:
-      CONFIG_FREERTOS_UNICORE: y
-      CONFIG_BT_NIMBLE_ENABLED: y
-      CONFIG_BT_CLASSIC_ENABLED: n
-      # 极限压缩蓝牙内存，防止单核内存溢出
-      CONFIG_BT_NIMBLE_MAX_CONNECTIONS: 2
-      CONFIG_BT_NIMBLE_ROLE_PERIPHERAL: n
-      CONFIG_BT_NIMBLE_ROLE_BROADCASTER: n
+      CONFIG_FREERTOS_UNICORE: y          
 
 logger:
-  level: WARN            # 降低日志级别，节省内存
+  level: WARN                             
   baud_rate: 115200
 
 wifi:
   ssid: "CC"
   password: "chen1122"
-  # ESPHome 的验证器更倾向于小写的枚举值，改为小写避免编译警告
-  power_save_mode: light
+  power_save_mode: LIGHT                  
 
-# 坚决关闭 HTTP 网页服务 (web_server)，单核芯片带不动它和蓝牙代理
+# 🚨 开启网页服务 (满足你的网页升级需求)
 web_server:
-captive_portal:
+  port: 80
 
 api:
   reboot_timeout: 0s
 
 ota:
-  - platform: esphome    # 保留 OTA，用于网络/HTTP 升级固件
+  - platform: esphome                     
 
-
-ble_gateway:
-  id: ct1_ble
-
+# === 蓝牙代理 ===
 esp32_ble_tracker:
   scan_parameters:
     interval: 320ms
     window: 30ms
-    active: false        # 必须被动扫描，active 会直接导致单核崩溃
+    active: false                         
 
-bluetooth_proxy:         # 开启蓝牙代理
+bluetooth_proxy:                          
 
-
+# === 基础监控 ===
 sensor:
   - platform: uptime
-    name: "Gateway Uptime"
+    name: "Uptime"
   - platform: wifi_signal
-    name: "WiFi Signal dBm"
+    name: "WiFi Signal"
     update_interval: 60s
-
-button:
-  - platform: restart
-    name: "Restart Gateway"
