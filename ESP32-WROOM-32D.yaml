@@ -55,30 +55,6 @@ esp32_ble_tracker:
 
 bluetooth_proxy:         # 开启蓝牙代理
 
-# === 你的按键控制（主动蓝牙连接） ===
-light:
-  - platform: ble_light
-    id: device_ct_light_ctrl
-    name: "Ct Light"
-    ble_device_id: "light.ct"
-    gateway: ct1_ble
-  - platform: ble_light
-    id: device_cw_light_ctrl
-    name: "Cw Light"
-    ble_device_id: "light.cw"
-    gateway: ct1_ble
-
-fan:
-  - platform: ble_fan
-    id: device_ct_fan_ctrl
-    name: "Ct Fan"
-    ble_device_id: "fan.ct"
-    gateway: ct1_ble
-  - platform: ble_fan
-    id: device_cw_fan_ctrl
-    name: "Cw Fan"
-    ble_device_id: "fan.cw"
-    gateway: ct1_ble
 
 sensor:
   - platform: uptime
