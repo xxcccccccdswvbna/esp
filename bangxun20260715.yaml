@@ -1,14 +1,21 @@
 esphome:
   name: ee
   friendly_name: 邦训小萌1s
-  on_boot:
-    priority: -100
-    then:
-      - script.execute: update_relay_led
+
+# ⭐⭐⭐⭐⭐ 新增：合并 Flash 写入，保护寿命
+preferences:
+  flash_write_interval: 10min
+
+on_boot:
+  priority: -100
+  then:
+    - script.execute: update_relay_led
 
 esp8266:
   board: esp01_1m
-  restore_from_flash: true
+  # ⭐⭐⭐⭐ 修改：关闭全局 Flash 恢复（除非你非常需要断电记忆）
+  # 如果必须保留继电器状态，请改回 true
+  restore_from_flash: false
 
 logger:
   baud_rate: 0
@@ -39,7 +46,8 @@ mqtt:
   username: "97109945d7e24559b3e4ca7a1f8ef160"
   password: "97109945d7e24559b3e4ca7a1f8ef160"
   client_id: "97109945d7e24559b3e4ca7a1f8ef160"
-  keepalive: 30s
+  # ⭐⭐ 修改：减少心跳包频率
+  keepalive: 60s
   discovery: false
 
   birth_message:
@@ -79,7 +87,6 @@ mqtt:
 
 # ================= 核心控制区 =================
 
-# 1. 底层输出：纯粹控制 GPIO 引脚
 output:
   # 继电器指示灯
   - platform: gpio
@@ -87,15 +94,14 @@ output:
     pin:
       number: GPIO12
       inverted: true
-      
+
   # WiFi 状态灯
   - platform: gpio
     id: wifi_led_output
     pin:
       number: GPIO13
-      inverted: true 
+      inverted: true
 
-# 2. 继电器灯同步脚本 (只管 GPIO12)
 script:
   - id: update_relay_led
     mode: restart
@@ -109,7 +115,6 @@ script:
           else:
             - output.turn_off: relay_led_output
 
-# 3. 实体开关定义
 switch:
   # 插座开关
   - platform: gpio
@@ -129,36 +134,36 @@ switch:
           topic: plug001/set
           payload: "off"
 
-  # 继电器指示灯总开关（仅做状态存储）
+  # 继电器指示灯总开关
   - platform: template
     id: relay_led_enable
     name: "继电器指示灯"
     optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
+    # ⭐⭐ 修改：不再写入 Flash 保存状态
+    restore_mode: ALWAYS_ON
     turn_on_action:
       - script.execute: update_relay_led
     turn_off_action:
       - script.execute: update_relay_led
 
-  # WiFi状态灯允许开关（仅做状态存储，实际控制由 interval 接管）
+  # WiFi状态灯允许开关
   - platform: template
     id: wifi_led_switch
     name: "WiFi指示灯"
     optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
+    # ⭐⭐ 修改：不再写入 Flash 保存状态
+    restore_mode: ALWAYS_ON
 
-# 4. WiFi 状态独立检测逻辑 (只管 GPIO13)
+# ⭐⭐⭐ 修改：降低检测频率，从 500ms 改为 1000ms
 interval:
-  - interval: 500ms
+  - interval: 1000ms
     then:
-      # 1. 如果 WiFi 指示灯功能被前端手动关闭，则强制熄灭
       - if:
           condition:
             lambda: return !id(wifi_led_switch).state;
           then:
             - output.turn_off: wifi_led_output
 
-      # 2. 如果功能开启，但未连接 WiFi -> 手动闪烁
       - if:
           condition:
             and:
@@ -174,7 +179,6 @@ interval:
                   id(wifi_led_output).turn_off();
                 }
 
-      # 3. 如果功能开启，且已连接 WiFi -> 常亮显示连接正常
       - if:
           condition:
             and:
@@ -203,7 +207,8 @@ sensor:
   - platform: wifi_signal
     id: wifi_db
     name: WiFi信号_WiFiSignal
-    update_interval: 60s
+    # ⭐⭐⭐ 修改：降低更新频率
+    update_interval: 300s
 
   - platform: template
     id: wifi_quality
@@ -214,6 +219,8 @@ sensor:
       if (x >= -50) return 100;
       return 2 * (x + 100);
     unit_of_measurement: "%"
+    # ⭐⭐⭐ 修改：降低更新频率
+    update_interval: 300s
 
   - platform: template
     id: free_heap
@@ -221,12 +228,14 @@ sensor:
     lambda: |-
       return ESP.getFreeHeap();
     unit_of_measurement: "B"
-    update_interval: 60s
+    # ⭐⭐⭐ 修改：降低更新频率
+    update_interval: 300s
 
   - platform: uptime
     id: uptime_sensor
     name: "运行时间_Uptime"
-    update_interval: 60s
+    # ⭐⭐⭐ 修改：降低更新频率
+    update_interval: 300s
 
 text_sensor:
   - platform: wifi_info
