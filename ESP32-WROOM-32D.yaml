@@ -1,57 +1,52 @@
 esphome:
-  name: ble-test
-  friendly_name: BLE Test
+  name: ct1
+  friendly_name: CT1 Lite
+  
+  # 🚨 核心补丁：通过 PlatformIO 编译选项强制指定 MAC 地址
+  # 这会直接修改底层固件的默认 MAC，完美绕过损坏的 eFuse
+  platformio_options:
+    build_flags: 
+      - "-D CONFIG_ESP32_MAC_ADDR=\"AA:BB:CC:DD:EE:FF\""
 
 esp32:
   board: esp32dev
-  flash_size: 4MB
   framework:
     type: esp-idf
     sdkconfig_options:
-      CONFIG_FREERTOS_UNICORE: "y"
+      CONFIG_FREERTOS_UNICORE: y          
 
 logger:
-  level: VERY_VERBOSE
-
-api:
-
-ota:
-  - platform: esphome
+  level: WARN                             
+  baud_rate: 115200
 
 wifi:
   ssid: "CC"
   password: "chen1122"
+  power_save_mode: LIGHT                  
 
+# 🚨 开启网页服务 (满足你的网页升级需求)
 web_server:
+  port: 80
 
-captive_portal:
+api:
+  reboot_timeout: 0s
 
-sensor:
-  - platform: uptime
-    name: Uptime
+ota:
+  - platform: esphome                     
 
-  - platform: wifi_signal
-    name: WiFi Signal
-    update_interval: 60s
-
-text_sensor:
-  - platform: wifi_info
-    ip_address:
-      name: IP Address
-    ssid:
-      name: Connected SSID
-    bssid:
-      name: Connected BSSID
-
+# === 蓝牙代理 ===
 esp32_ble_tracker:
   scan_parameters:
-    active: false
     interval: 320ms
     window: 30ms
+    active: false                         
 
-bluetooth_proxy:
-  active: true
+bluetooth_proxy:                          
 
-button:
-  - platform: restart
-    name: Restart
+# === 基础监控 ===
+sensor:
+  - platform: uptime
+    name: "Uptime"
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    update_interval: 60s
