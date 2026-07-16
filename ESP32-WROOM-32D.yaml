@@ -29,8 +29,8 @@ wifi:
   power_save_mode: light
 
 # 坚决关闭 HTTP 网页服务 (web_server)，单核芯片带不动它和蓝牙代理
-# web_server:
-# captive_portal:
+web_server:
+captive_portal:
 
 api:
   reboot_timeout: 0s
