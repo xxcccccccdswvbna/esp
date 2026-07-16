@@ -38,11 +38,6 @@ api:
 ota:
   - platform: esphome    # 保留 OTA，用于网络/HTTP 升级固件
 
-external_components:
-  - source:
-      type: local
-      # 请确保 components 文件夹路径不要包含空格，且在当前目录下
-      path: components
 
 ble_gateway:
   id: ct1_ble
