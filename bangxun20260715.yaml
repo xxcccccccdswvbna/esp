@@ -8,10 +8,15 @@ esphome:
 
 esp8266:
   board: esp01_1m
-  restore_from_flash: true
+  # 已移除废弃的 restore_from_flash: true
 
+# ================= 核心优化 1：闪存读写保护 =================
+preferences:
+  flash_write_interval: 10min # 延迟闪存写入。状态改变后在内存中缓存，10分钟后统一写入闪存，极大延长设备寿命
+
+# ================= 核心优化 2：释放 RAM =================
 logger:
-  baud_rate: 0
+  level: NONE # 完全关闭日志引擎（仅 baud_rate: 0 仍会占用缓存内存）
 
 api:
 
@@ -30,6 +35,7 @@ wifi:
 
 captive_portal:
 
+# 注意：Web Server 在 ESP8266 上占用极大内存（约 10-15KB）。如果不需要网页控制，建议直接注释掉以下两行
 web_server:
   port: 80
 
@@ -41,32 +47,17 @@ mqtt:
   client_id: "97109945d7e24559b3e4ca7a1f8ef160"
   keepalive: 30s
   discovery: false
-
   birth_message:
     topic: plug001/up
     payload: "online"
-
   will_message:
     topic: plug001/up
     payload: "offline"
-
   on_connect:
     then:
-      - if:
-          condition:
-            switch.is_on: relay
-          then:
-            - mqtt.publish:
-                topic: plug001/up
-                payload: "on"
-      - if:
-          condition:
-            switch.is_off: relay
-          then:
-            - mqtt.publish:
-                topic: plug001/up
-                payload: "off"
-
+      - mqtt.publish:
+          topic: plug001/up
+          payload: !lambda 'return id(relay).state ? "on" : "off";' # 优化：合并条件判断
   on_message:
     - topic: plug001
       then:
@@ -79,57 +70,43 @@ mqtt:
 
 # ================= 核心控制区 =================
 
-# 1. 底层输出：纯粹控制 GPIO 引脚
 output:
-  # 继电器指示灯
   - platform: gpio
     id: relay_led_output
     pin:
       number: GPIO12
       inverted: true
       
-  # WiFi 状态灯
   - platform: gpio
     id: wifi_led_output
     pin:
       number: GPIO13
       inverted: true 
 
-# 2. 继电器灯同步脚本 (只管 GPIO12)
 script:
   - id: update_relay_led
     mode: restart
     then:
-      - if:
-          condition:
-            lambda: |-
-              return id(relay).state && id(relay_led_enable).state;
-          then:
-            - output.turn_on: relay_led_output
-          else:
-            - output.turn_off: relay_led_output
+      - output.set_level:
+          id: relay_led_output
+          level: !lambda 'return (id(relay).state && id(relay_led_enable).state) ? 1.0 : 0.0;' # 优化：消除繁琐的 if/else 动作队列
 
-# 3. 实体开关定义
 switch:
-  # 插座开关
   - platform: gpio
     id: relay
     name: "插座开关"
     pin: GPIO15
-
     on_turn_on:
       - script.execute: update_relay_led
       - mqtt.publish:
           topic: plug001/set
           payload: "on"
-
     on_turn_off:
       - script.execute: update_relay_led
       - mqtt.publish:
           topic: plug001/set
           payload: "off"
 
-  # 继电器指示灯总开关（仅做状态存储）
   - platform: template
     id: relay_led_enable
     name: "继电器指示灯"
@@ -140,48 +117,28 @@ switch:
     turn_off_action:
       - script.execute: update_relay_led
 
-  # WiFi状态灯允许开关（仅做状态存储，实际控制由 interval 接管）
   - platform: template
     id: wifi_led_switch
     name: "WiFi指示灯"
     optimistic: true
     restore_mode: RESTORE_DEFAULT_ON
 
-# 4. WiFi 状态独立检测逻辑 (只管 GPIO13)
+# ================= 核心优化 3：精简循环开销 =================
 interval:
   - interval: 500ms
     then:
-      # 1. 如果 WiFi 指示灯功能被前端手动关闭，则强制熄灭
-      - if:
-          condition:
-            lambda: return !id(wifi_led_switch).state;
-          then:
-            - output.turn_off: wifi_led_output
-
-      # 2. 如果功能开启，但未连接 WiFi -> 手动闪烁
-      - if:
-          condition:
-            and:
-              - lambda: return id(wifi_led_switch).state;
-              - not: wifi.connected
-          then:
-            - lambda: |-
-                static bool toggle_state = false;
-                toggle_state = !toggle_state;
-                if (toggle_state) {
-                  id(wifi_led_output).turn_on();
-                } else {
-                  id(wifi_led_output).turn_off();
-                }
-
-      # 3. 如果功能开启，且已连接 WiFi -> 常亮显示连接正常
-      - if:
-          condition:
-            and:
-              - lambda: return id(wifi_led_switch).state;
-              - wifi.connected
-          then:
-            - output.turn_on: wifi_led_output
+      - lambda: |-
+          // 使用原生 C++ 逻辑替代 YAML 动作树，大幅减少每次执行的 CPU 查表和内存分配开销
+          if (!id(wifi_led_switch).state) {
+            id(wifi_led_output).turn_off();
+          } else if (network::is_connected()) {
+            id(wifi_led_output).turn_on();
+          } else {
+            static bool toggle = false;
+            toggle = !toggle;
+            if (toggle) id(wifi_led_output).turn_on();
+            else id(wifi_led_output).turn_off();
+          }
 
 # ================= 核心控制区结束 =================
 
@@ -194,8 +151,7 @@ binary_sensor:
       mode: INPUT_PULLUP
     filters:
       - invert:
-      - delayed_on: 50ms
-      - delayed_off: 50ms
+      - delayed_on: 20ms # 优化：通常按键防抖 20ms 足矣，无需 off 延时，减少定时器内存消耗
     on_press:
       - switch.toggle: relay
 
