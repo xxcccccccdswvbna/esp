@@ -122,9 +122,11 @@ binary_sensor:
       mode: INPUT_PULLUP
     filters:
       - invert:
-      - delayed_on: 20ms # 20ms 防抖足矣
+      - delayed_on: 100ms  # 延长防抖，彻底无视杂波干扰
+      - delayed_off: 100ms 
     on_press:
       - switch.toggle: relay
+
 
 switch:
   # 1. 物理插座开关
