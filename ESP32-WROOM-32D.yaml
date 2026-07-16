@@ -16,38 +16,36 @@ esp32:
   framework:
     type: esp-idf
     sdkconfig_options:
-      CONFIG_FREERTOS_UNICORE: y          # 强制单核
-      CONFIG_BT_NIMBLE_ENABLED: y         # 使用轻量级 NimBLE 蓝牙栈
-      # 移除了 CONFIG_BT_CLASSIC_ENABLED: n，防止缺失 esp_bt_defs.h 导致编译失败
+      # 只保留单核配置，绝对不要手动去配置 BT_ 相关的选项！
+      CONFIG_FREERTOS_UNICORE: y          
 
 logger:
-  level: WARN                             # 降低日志级别，节省内存
+  level: WARN                             
   baud_rate: 115200
 
 wifi:
   ssid: "CC"
   password: "chen1122"
-  power_save_mode: LIGHT                  # 开启省电模式
+  power_save_mode: LIGHT                  
 
 # 🚨 开启网页服务 (满足你的网页升级需求)
 web_server:
   port: 80
-  # 注意：坚决不要加 captive_portal，否则单核必崩！
 
 api:
   reboot_timeout: 0s
 
 ota:
-  - platform: esphome                     # 保留 OTA，用于网络/HTTP 升级固件
+  - platform: esphome                     
 
 # === 蓝牙代理 ===
 esp32_ble_tracker:
   scan_parameters:
     interval: 320ms
     window: 30ms
-    active: false                         # 必须被动扫描
+    active: false                         
 
-bluetooth_proxy:                          # 开启蓝牙代理
+bluetooth_proxy:                          
 
 # === 基础监控 ===
 sensor:
