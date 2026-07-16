@@ -87,9 +87,14 @@ script:
   - id: update_relay_led
     mode: restart
     then:
-      - output.set_level:
-          id: relay_led_output
-          level: !lambda 'return (id(relay).state && id(relay_led_enable).state) ? 1.0 : 0.0;' # 优化：消除繁琐的 if/else 动作队列
+      - lambda: |-
+          // 直接在 C++ 底层判断并执行，避免 YAML 的 if 动作节点带来的内存开销
+          if (id(relay).state && id(relay_led_enable).state) {
+            id(relay_led_output).turn_on();
+          } else {
+            id(relay_led_output).turn_off();
+          }
+
 
 switch:
   - platform: gpio
