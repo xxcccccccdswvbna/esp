@@ -4,39 +4,36 @@ esphome:
 
 esp8266:
   board: esp01_1m
-  restore_from_flash: false # 不保存断电状态，彻底告别 Flash 写入焦虑
+  restore_from_flash: false
 
 logger:
-  baud_rate: 0 # 关闭串口日志，节省资源
+  baud_rate: 0
 
-# 1. 基础网络与 OTA
 wifi:
   ssid: "CC"
   password: "chen1122"
   reboot_timeout: 0s
-  ap: # 备用热点
+  ap:
     ssid: "EE-Setup"
     password: "12345678"
 
+# 修正了这里的 OTA 格式
 ota:
-  - platform: esphome
-    password: "chen1122"
+  platform: esphome
+  password: "chen1122"
 
-# 2. 保留原生 API (供 ESPHome App 或 Home Assistant 直连)
 api:
 
-# 3. 保留 Web Server (供浏览器网页控制)
 web_server:
   port: 80
 
-# 4. 保留 MQTT (供巴法云等第三方平台控制)
 mqtt:
   broker: bemfa.com
   port: 9501
   username: "97109945d7e24559b3e4ca7a1f8ef160"
   password: "97109945d7e24559b3e4ca7a1f8ef160"
   client_id: "97109945d7e24559b3e4ca7a1f8ef160"
-  keepalive: 60s # 优化：降低心跳频率
+  keepalive: 60s
   discovery: false
 
   birth_message:
@@ -71,17 +68,13 @@ mqtt:
               id(relay).turn_off();
             }
 
-# ================= 核心控制区 =================
-
 output:
-  # 继电器指示灯输出
   - platform: gpio
     id: relay_led_output
     pin:
       number: GPIO12
       inverted: true
 
-  # WiFi 状态灯输出
   - platform: gpio
     id: wifi_led_output
     pin:
@@ -89,13 +82,11 @@ output:
       inverted: true
 
 switch:
-  # 继电器开关
   - platform: gpio
     id: relay
     name: "插座开关"
     pin: GPIO15
     
-    # 极简同步逻辑：继电器状态改变时，直接控制指示灯并同步 MQTT
     on_turn_on:
       - output.turn_on: relay_led_output
       - mqtt.publish:
@@ -107,16 +98,15 @@ switch:
           topic: plug001/set
           payload: "off"
 
-# WiFi 状态灯检测逻辑
 interval:
-  - interval: 1000ms # 1秒检测一次，降低 CPU 负载
+  - interval: 1000ms
     then:
       - if:
           condition: wifi.connected
           then:
-            - output.turn_off: wifi_led_output # 连上 WiFi -> 关灯
+            - output.turn_off: wifi_led_output
           else:
-            - lambda: |- # 没连上 WiFi -> 闪烁
+            - lambda: |-
                 static bool toggle_state = false;
                 toggle_state = !toggle_state;
                 if (toggle_state) {
@@ -125,9 +115,6 @@ interval:
                   id(wifi_led_output).turn_off();
                 }
 
-# ================= 核心控制区结束 =================
-
-# 保留物理按键控制
 binary_sensor:
   - platform: gpio
     id: button_input
