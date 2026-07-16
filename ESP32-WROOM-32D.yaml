@@ -7,7 +7,8 @@ esphome:
     priority: 1000.0
     then:
       - lambda: |-
-          extern "C" esp_err_t esp_base_mac_addr_set(const uint8_t *mac);
+          #include "esp_mac_addr.h"
+          #include "esp_system.h"
           uint8_t custom_mac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
           esp_base_mac_addr_set(custom_mac);
 
@@ -16,7 +17,6 @@ esp32:
   framework:
     type: esp-idf
     sdkconfig_options:
-      # 只保留单核配置，绝对不要手动去配置 BT_ 相关的选项！
       CONFIG_FREERTOS_UNICORE: y          
 
 logger:
