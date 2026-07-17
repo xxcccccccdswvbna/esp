@@ -1,6 +1,14 @@
+substitutions:
+  test_gpio: "2"
+
 esphome:
-  name: yeelight-led-test
-  friendly_name: Yeelight LED Test
+  name: ct1
+  friendly_name: "CT1 Gateway"
+  on_boot:
+    priority: 600.0
+    then:
+      - light.turn_on: blue_led
+      - light.turn_on: white_led
 
 esp32:
   board: esp32dev
@@ -8,12 +16,21 @@ esp32:
   framework:
     type: esp-idf
     sdkconfig_options:
+      # 🚨 核心：强制单核模式，防止双核初始化导致崩溃
       CONFIG_FREERTOS_UNICORE: y
 
 logger:
-  level: DEBUG
+  level: DEBUG          # 改为 DEBUG，既能看清按键日志，又比 VERY_VERBOSE 省内存
+  baud_rate: 115200     # 开启串口日志，方便调试按键逻辑
 
 api:
+  reboot_timeout: 0s
+  on_client_connected:
+    - script.stop: offline_flash
+    - light.turn_off: white_led
+    - light.turn_off: blue_led
+  on_client_disconnected:
+    - script.execute: offline_flash
 
 ota:
   - platform: esphome
@@ -21,50 +38,349 @@ ota:
 wifi:
   ssid: "CC"
   password: "chen1122"
-
-web_server:
+  fast_connect: true
+  power_save_mode: none
+  ap:
+    ssid: "CT1 Fallback"
+    password: "12345678"
 
 captive_portal:
+web_server:
 
-esp32_ble:
+# ================= 全局变量与脚本 (已清理蓝牙相关) =================
+globals:
+  - id: do_factory_reset
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: safe_mode_tap_count
+    type: int
+    restore_value: no
+    initial_value: '0'
 
-bluetooth_proxy:
-  active: true
+script:
+  - id: offline_flash
+    mode: restart
+    then:
+      - while:
+          condition:
+            lambda: 'return true;'
+          then:
+            - light.toggle: white_led
+            - delay: 500ms
 
+# ================= 传感器 =================
 sensor:
   - platform: uptime
-    name: Uptime
+    name: "Uptime"
+  - platform: internal_temperature
+    name: "ESP32 Chip Temperature"
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    update_interval: 60s     
+  - platform: wifi_signal
+    name: "WiFi Signal Strength"
+    id: wifi_signal_db
+    update_interval: 60s
+  - platform: copy
+    source_id: wifi_signal_db
+    name: "WiFi Signal Percent"
+    filters:
+      - lambda: return min(max(2 * (x + 100.0), 0.0), 100.0);
+    unit_of_measurement: "%"
+    icon: mdi:wifi-strength-4
 
 text_sensor:
   - platform: wifi_info
     ip_address:
-      name: IP
+      name: "ESP IP Address"
+    ssid:
+      name: "ESP Connected SSID"
+    bssid:
+      name: "ESP Connected BSSID"
 
-binary_sensor:
+# ================= 输出与灯光 =================
+output:
   - platform: gpio
-    pin: GPIO34
-    name: KEY1
-    on_press:
-      - logger.log: "KEY1"
+    id: blue_led_out
+    pin:
+      number: GPIO27
+      inverted: true
+  - platform: gpio
+    id: white_led_out
+    pin:
+      number: GPIO26
+      inverted: true
+  - platform: gpio
+    id: test_output
+    pin:
+      number: GPIO${test_gpio}
 
-  - platform: gpio
-    pin: GPIO35
-    name: KEY2
-    on_press:
-      - logger.log: "KEY2"
+light:
+  - platform: binary
+    name: "Blue LED"
+    id: blue_led
+    output: blue_led_out
+    restore_mode: RESTORE_DEFAULT_OFF
+  - platform: binary
+    name: "White LED"
+    id: white_led
+    output: white_led_out
+    restore_mode: RESTORE_DEFAULT_OFF
 
-  - platform: gpio
-    pin: GPIO32
-    name: KEY3
-    on_press:
-      - logger.log: "KEY3"
-
-  - platform: gpio
-    pin: GPIO33
-    name: KEY4
-    on_press:
-      - logger.log: "KEY4"
+switch:
+  - platform: output
+    name: "GPIO ${test_gpio} Test"
+    output: test_output
 
 button:
+  - platform: template
+    name: "测试 GPIO"
+    on_press:
+      - logger.log: "========== START TEST =========="
+      - output.turn_on: test_output
+      - delay: 1s
+      - output.turn_off: test_output
+      - delay: 300ms
+      - output.turn_on: test_output
+      - delay: 300ms
+      - output.turn_off: test_output
+      - delay: 300ms
+      - output.turn_on: test_output
+      - delay: 300ms
+      - output.turn_off: test_output
+      - logger.log: "========== END TEST =========="
   - platform: restart
-    name: Restart
+    name: "Restart Gateway"
+
+# ================= 物理按键逻辑 (完整移植) =================
+binary_sensor:
+  # KEY1 GPIO34
+  - platform: gpio
+    id: key1
+    name: "KEY1"
+    pin:
+      number: GPIO34
+      inverted: true
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 20ms
+    on_multi_click:
+      - timing:
+          - ON for at least 8s
+        then:
+          - if:
+              condition:
+                binary_sensor.is_on: key4
+              then:
+                - delay: 500ms
+                - if:
+                    condition:
+                      binary_sensor.is_on: key4
+                    then:
+                      - lambda: 'id(do_factory_reset) = true;'
+                      - repeat:
+                          count: 5
+                          then:
+                            - light.toggle: white_led
+                            - delay: 100ms
+                      - lambda: 'App.reboot();'
+      - timing:
+          - ON for at least 1.5s
+        then:
+          - light.turn_on: blue_led
+          - delay: 200ms
+          - light.turn_off: blue_led
+          - homeassistant.event:
+              event: esphome.gateway_key
+              data:
+                key: "key1"
+                mode: "long"
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at most 0.3s
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - light.turn_on: blue_led
+          - delay: 200ms
+          - light.turn_off: blue_led
+          - homeassistant.event:
+              event: esphome.gateway_key
+              data:
+                key: "key1"
+                mode: "double"
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - light.turn_on: blue_led
+          - delay: 200ms
+          - light.turn_off: blue_led
+          - homeassistant.event:
+              event: esphome.gateway_key
+              data:
+                key: "key1"
+                mode: "single"
+
+  # KEY2 GPIO35
+  - platform: gpio
+    id: key2
+    name: "KEY2"
+    pin:
+      number: GPIO35
+      inverted: true
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 20ms
+    on_multi_click:
+      - timing:
+          - ON for at least 1.5s
+        then:
+          - light.turn_on: blue_led
+          - delay: 200ms
+          - light.turn_off: blue_led
+          - homeassistant.event:
+              event: esphome.gateway_key
+              data:
+                key: "key2"
+                mode: "long"
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at most 0.3s
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - light.turn_on: blue_led
+          - delay: 200ms
+          - light.turn_off: blue_led
+          - homeassistant.event:
+              event: esphome.gateway_key
+              data:
+                key: "key2"
+                mode: "double"
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - light.turn_on: blue_led
+          - delay: 200ms
+          - light.turn_off: blue_led
+          - homeassistant.event:
+              event: esphome.gateway_key
+              data:
+                key: "key2"
+                mode: "single"
+          - lambda: 'id(safe_mode_tap_count)++;'
+          - if:
+              condition:
+                lambda: 'return id(safe_mode_tap_count) >= 5;'
+              then:
+                - lambda: 'id(safe_mode_tap_count) = 0;'
+                - repeat:
+                    count: 8
+                    then:
+                      - light.toggle: blue_led
+                      - delay: 150ms
+                - lambda: 'App.safe_reboot();' 
+              else:
+                - delay: 5000ms
+                - lambda: 'id(safe_mode_tap_count) = 0;'
+
+  # KEY3 GPIO32
+  - platform: gpio
+    id: key3
+    name: "KEY3"
+    pin:
+      number: GPIO32
+      inverted: true
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 20ms
+    on_multi_click:
+      - timing:
+          - ON for at least 1.5s
+        then:
+          - light.turn_on: blue_led
+          - delay: 200ms
+          - light.turn_off: blue_led
+          - homeassistant.event:
+              event: esphome.gateway_key
+              data:
+                key: "key3"
+                mode: "long"
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at most 0.3s
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - light.turn_on: blue_led
+          - delay: 200ms
+          - light.turn_off: blue_led
+          - homeassistant.event:
+              event: esphome.gateway_key
+              data:
+                key: "key3"
+                mode: "double"
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - light.turn_on: blue_led
+          - delay: 200ms
+          - light.turn_off: blue_led
+          - homeassistant.event:
+              event: esphome.gateway_key
+              data:
+                key: "key3"
+                mode: "single"
+
+  # KEY4 GPIO33
+  - platform: gpio
+    id: key4
+    name: "KEY4"
+    pin:
+      number: GPIO33
+      inverted: true
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 20ms
+    on_multi_click:
+      - timing:
+          - ON for at least 1.5s
+        then:
+          - light.turn_on: blue_led
+          - delay: 200ms
+          - light.turn_off: blue_led
+          - homeassistant.event:
+              event: esphome.gateway_key
+              data:
+                key: "key4"
+                mode: "long"
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at most 0.3s
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - light.turn_on: blue_led
+          - delay: 200ms
+          - light.turn_off: blue_led
+          - homeassistant.event:
+              event: esphome.gateway_key
+              data:
+                key: "key4"
+                mode: "double"
+      - timing:
+          - ON for at most 0.5s
+          - OFF for at least 0.3s
+        then:
+          - light.turn_on: blue_led
+          - delay: 200ms
+          - light.turn_off: blue_led
+          - homeassistant.event:
+              event: esphome.gateway_key
+              data:
+                key: "key4"
+                mode: "single"
