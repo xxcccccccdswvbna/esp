@@ -61,5 +61,3 @@ binary_sensor:
       - logger.log: "KEY4"
 
 
-  - platform: restart
-    name: Restart
