@@ -1,17 +1,15 @@
 esphome:
-  name: ble-test
-  friendly_name: BLE Test
+  name: yeelight-test
+  friendly_name: Yeelight Test
 
 esp32:
   board: esp32dev
   flash_size: 4MB
   framework:
-    type: esp-idf
-    sdkconfig_options:
-      CONFIG_FREERTOS_UNICORE: y
+    type: arduino
 
 logger:
-  level: VERY_VERBOSE
+  level: INFO
 
 api:
 
@@ -26,16 +24,32 @@ web_server:
 
 captive_portal:
 
-esp32_ble_tracker:
+binary_sensor:
+  - platform: gpio
+    pin: GPIO34
+    name: KEY1
 
-sensor:
-  - platform: uptime
-    name: Uptime
+  - platform: gpio
+    pin: GPIO35
+    name: KEY2
 
-text_sensor:
-  - platform: wifi_info
-    ip_address:
-      name: IP
+  - platform: gpio
+    pin: GPIO32
+    name: KEY3
+
+  - platform: gpio
+    pin: GPIO33
+    name: KEY4
+
+output:
+  - platform: gpio
+    id: gpio2
+    pin: GPIO2
+
+switch:
+  - platform: output
+    name: GPIO2
+    output: gpio2
 
 button:
   - platform: restart
