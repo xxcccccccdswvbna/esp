@@ -60,34 +60,6 @@ binary_sensor:
     on_press:
       - logger.log: "KEY4"
 
-output:
-  - platform: gpio
-    id: test_output
-    pin:
-      number: GPIO${test_gpio}
-
-switch:
-  - platform: output
-    name: GPIO ${test_gpio}
-    output: test_output
-
-button:
-  - platform: template
-    name: 测试GPIO
-    on_press:
-      - logger.log: "========== START TEST =========="
-      - output.turn_on: test_output
-      - delay: 1s
-      - output.turn_off: test_output
-      - delay: 300ms
-      - output.turn_on: test_output
-      - delay: 300ms
-      - output.turn_off: test_output
-      - delay: 300ms
-      - output.turn_on: test_output
-      - delay: 300ms
-      - output.turn_off: test_output
-      - logger.log: "========== END TEST =========="
 
   - platform: restart
     name: Restart
